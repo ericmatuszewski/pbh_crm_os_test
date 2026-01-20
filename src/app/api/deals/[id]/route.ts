@@ -1,0 +1,115 @@
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { updateDealSchema } from "@/lib/validations";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const deal = await prisma.deal.findUnique({
+      where: { id: params.id },
+      include: {
+        contact: true,
+        company: true,
+        owner: { select: { id: true, name: true, email: true, image: true } },
+        activities: {
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        },
+        notes: {
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        },
+      },
+    });
+
+    if (!deal) {
+      return NextResponse.json(
+        { success: false, error: { code: "NOT_FOUND", message: "Deal not found" } },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: { ...deal, value: Number(deal.value) },
+    });
+  } catch (error) {
+    console.error("Error fetching deal:", error);
+    return NextResponse.json(
+      { success: false, error: { code: "FETCH_ERROR", message: "Failed to fetch deal" } },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const body = await request.json();
+    const data = updateDealSchema.parse(body);
+
+    const updateData: Record<string, unknown> = {};
+
+    if (data.title) updateData.title = data.title;
+    if (data.value !== undefined) updateData.value = data.value;
+    if (data.currency) updateData.currency = data.currency;
+    if (data.stage) {
+      updateData.stage = data.stage;
+      if (data.stage === "CLOSED_WON" || data.stage === "CLOSED_LOST") {
+        updateData.closedAt = new Date();
+      }
+    }
+    if (data.probability !== undefined) updateData.probability = data.probability;
+    if (data.expectedCloseDate !== undefined) {
+      updateData.expectedCloseDate = data.expectedCloseDate ? new Date(data.expectedCloseDate) : null;
+    }
+    if (data.contactId !== undefined) updateData.contactId = data.contactId || null;
+    if (data.companyId !== undefined) updateData.companyId = data.companyId || null;
+    if (data.ownerId) updateData.ownerId = data.ownerId;
+
+    const deal = await prisma.deal.update({
+      where: { id: params.id },
+      data: updateData,
+      include: {
+        contact: { select: { id: true, firstName: true, lastName: true } },
+        company: { select: { id: true, name: true } },
+        owner: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: { ...deal, value: Number(deal.value) },
+    });
+  } catch (error) {
+    console.error("Error updating deal:", error);
+    return NextResponse.json(
+      { success: false, error: { code: "UPDATE_ERROR", message: "Failed to update deal" } },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await prisma.deal.delete({
+      where: { id: params.id },
+    });
+
+    return NextResponse.json({ success: true, data: null });
+  } catch (error) {
+    console.error("Error deleting deal:", error);
+    return NextResponse.json(
+      { success: false, error: { code: "DELETE_ERROR", message: "Failed to delete deal" } },
+      { status: 500 }
+    );
+  }
+}
