@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,39 +27,11 @@ import {
   Type,
   Layout,
   Sidebar,
-  Save,
-  Loader2,
+  RotateCcw,
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
-
-interface AppearanceSettings {
-  theme: "light" | "dark" | "system";
-  accentColor: string;
-  fontSize: "small" | "medium" | "large";
-  compactMode: boolean;
-  sidebarCollapsed: boolean;
-  showAvatars: boolean;
-  animationsEnabled: boolean;
-  highContrastMode: boolean;
-  dateFormat: string;
-  timeFormat: "12h" | "24h";
-  weekStartsOn: "sunday" | "monday";
-}
-
-const defaultSettings: AppearanceSettings = {
-  theme: "system",
-  accentColor: "#3b82f6",
-  fontSize: "medium",
-  compactMode: false,
-  sidebarCollapsed: false,
-  showAvatars: true,
-  animationsEnabled: true,
-  highContrastMode: false,
-  dateFormat: "DD/MM/YYYY",
-  timeFormat: "24h",
-  weekStartsOn: "monday",
-};
+import { useAppearance, defaultSettings, AppearanceSettings } from "@/contexts/AppearanceContext";
 
 const ACCENT_COLORS = [
   { value: "#3b82f6", label: "Blue", class: "bg-blue-500" },
@@ -82,66 +53,20 @@ const DATE_FORMATS = [
 ];
 
 export default function AppearanceSettingsPage() {
-  const [settings, setSettings] = useState<AppearanceSettings>(defaultSettings);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const { settings, updateSettings, resetSettings } = useAppearance();
 
-  const fetchSettings = useCallback(async () => {
-    try {
-      const response = await fetch("/api/settings/appearance");
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data) {
-          setSettings({ ...defaultSettings, ...data.data });
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch appearance settings:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      const response = await fetch("/api/settings/appearance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
-      });
-
-      if (response.ok) {
-        toast.success("Appearance settings saved");
-      } else {
-        toast.error("Failed to save settings");
-      }
-    } catch (error) {
-      console.error("Failed to save appearance settings:", error);
-      toast.error("Failed to save settings");
-    } finally {
-      setIsSaving(false);
-    }
+  const handleReset = () => {
+    resetSettings();
+    toast.success("Settings reset to defaults");
   };
 
   const updateSetting = <K extends keyof AppearanceSettings>(
     key: K,
     value: AppearanceSettings[K]
   ) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+    updateSettings({ [key]: value });
+    toast.success("Setting applied");
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -155,13 +80,9 @@ export default function AppearanceSettingsPage() {
             Customize the look and feel of your CRM
           </p>
         </div>
-        <Button onClick={handleSave} disabled={isSaving}>
-          {isSaving ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-4 w-4" />
-          )}
-          Save Changes
+        <Button variant="outline" onClick={handleReset}>
+          <RotateCcw className="mr-2 h-4 w-4" />
+          Reset to Defaults
         </Button>
       </div>
 

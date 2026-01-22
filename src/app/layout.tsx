@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { BusinessProvider } from "@/contexts/BusinessContext";
+import { AppearanceProvider } from "@/contexts/AppearanceContext";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -24,9 +25,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <BusinessProvider>
-          {children}
-        </BusinessProvider>
+        <AppearanceProvider>
+          <BusinessProvider>
+            {children}
+          </BusinessProvider>
+        </AppearanceProvider>
         <Toaster richColors position="top-right" />
       </body>
     </html>

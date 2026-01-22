@@ -57,3 +57,74 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Appearance Settings - Compact Mode */
+body.compact-mode {
+  --spacing-multiplier: 0.75;
+}
+
+body.compact-mode .p-6 {
+  padding: 1rem;
+}
+
+body.compact-mode .p-4 {
+  padding: 0.75rem;
+}
+
+body.compact-mode .gap-6 {
+  gap: 1rem;
+}
+
+body.compact-mode .gap-4 {
+  gap: 0.5rem;
+}
+
+body.compact-mode .space-y-6 > * + * {
+  margin-top: 1rem;
+}
+
+body.compact-mode .space-y-4 > * + * {
+  margin-top: 0.5rem;
+}
+
+body.compact-mode .mb-6 {
+  margin-bottom: 1rem;
+}
+
+body.compact-mode .mb-4 {
+  margin-bottom: 0.5rem;
+}
+
+/* Appearance Settings - No Animations */
+body.no-animations,
+body.no-animations * {
+  animation-duration: 0ms !important;
+  animation-delay: 0ms !important;
+  transition-duration: 0ms !important;
+  transition-delay: 0ms !important;
+}
+
+/* Appearance Settings - High Contrast Mode */
+body.high-contrast {
+  --foreground: 0 0% 0%;
+  --muted-foreground: 0 0% 20%;
+  --border: 0 0% 40%;
+}
+
+.dark body.high-contrast,
+body.high-contrast.dark {
+  --foreground: 0 0% 100%;
+  --muted-foreground: 0 0% 85%;
+  --border: 0 0% 60%;
+}
+
+body.high-contrast button,
+body.high-contrast a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+body.high-contrast button:hover,
+body.high-contrast a:hover {
+  text-decoration: none;
+}
