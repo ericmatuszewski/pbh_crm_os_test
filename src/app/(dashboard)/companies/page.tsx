@@ -58,7 +58,8 @@ export default function CompaniesPage() {
     size: "",
     address: "",
     city: "",
-    state: "",
+    county: "",
+    postcode: "",
     country: "",
   });
 
@@ -100,7 +101,8 @@ export default function CompaniesPage() {
         size: company.size || "",
         address: company.address || "",
         city: company.city || "",
-        state: company.state || "",
+        county: company.county || "",
+        postcode: company.postcode || "",
         country: company.country || "",
       });
     } else {
@@ -112,7 +114,8 @@ export default function CompaniesPage() {
         size: "",
         address: "",
         city: "",
-        state: "",
+        county: "",
+        postcode: "",
         country: "",
       });
     }
@@ -252,7 +255,7 @@ export default function CompaniesPage() {
                           {company.city || company.country ? (
                             <div className="flex items-center gap-1 text-sm text-gray-600">
                               <MapPin className="w-3 h-3" />
-                              {[company.city, company.state, company.country]
+                              {[company.city, company.postcode, company.country]
                                 .filter(Boolean)
                                 .join(", ")}
                             </div>
@@ -389,9 +392,9 @@ export default function CompaniesPage() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
+                <Label htmlFor="city">City/Town</Label>
                 <Input
                   id="city"
                   value={formData.city}
@@ -401,13 +404,27 @@ export default function CompaniesPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="state">State/Province</Label>
+                <Label htmlFor="county">County</Label>
                 <Input
-                  id="state"
-                  value={formData.state}
+                  id="county"
+                  value={formData.county}
                   onChange={(e) =>
-                    setFormData({ ...formData, state: e.target.value })
+                    setFormData({ ...formData, county: e.target.value })
                   }
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="postcode">Postcode</Label>
+                <Input
+                  id="postcode"
+                  value={formData.postcode}
+                  onChange={(e) =>
+                    setFormData({ ...formData, postcode: e.target.value.toUpperCase() })
+                  }
+                  placeholder="e.g., SW1A 2AA"
                 />
               </div>
               <div className="space-y-2">
@@ -418,6 +435,7 @@ export default function CompaniesPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, country: e.target.value })
                   }
+                  placeholder="United Kingdom"
                 />
               </div>
             </div>

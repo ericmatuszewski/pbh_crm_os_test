@@ -58,7 +58,8 @@ export async function PUT(
         ...(data.size !== undefined && { size: data.size }),
         ...(data.address !== undefined && { address: data.address || null }),
         ...(data.city !== undefined && { city: data.city || null }),
-        ...(data.state !== undefined && { state: data.state || null }),
+        ...(data.county !== undefined && { county: data.county || null }),
+        ...(data.postcode !== undefined && { postcode: data.postcode || null }),
         ...(data.country !== undefined && { country: data.country || null }),
       },
     });

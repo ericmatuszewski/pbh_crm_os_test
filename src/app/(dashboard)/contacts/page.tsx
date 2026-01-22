@@ -23,7 +23,7 @@ const sampleContacts: Contact[] = [
     title: "VP of Sales",
     status: ContactStatus.CUSTOMER,
     companyId: "1",
-    company: { id: "1", name: "Acme Corp", website: null, industry: "Technology", size: null, address: null, city: null, state: null, country: null, createdAt: new Date(), updatedAt: new Date() },
+    company: { id: "1", name: "Acme Corp", website: null, industry: "Technology", size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() },
     source: "Website",
     ownerId: null,
     createdAt: new Date("2024-01-15"),
@@ -38,7 +38,7 @@ const sampleContacts: Contact[] = [
     title: "CEO",
     status: ContactStatus.QUALIFIED,
     companyId: "2",
-    company: { id: "2", name: "TechStart Inc", website: null, industry: "SaaS", size: null, address: null, city: null, state: null, country: null, createdAt: new Date(), updatedAt: new Date() },
+    company: { id: "2", name: "TechStart Inc", website: null, industry: "SaaS", size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() },
     source: "Referral",
     ownerId: null,
     createdAt: new Date("2024-01-18"),
@@ -53,7 +53,7 @@ const sampleContacts: Contact[] = [
     title: "Procurement Manager",
     status: ContactStatus.LEAD,
     companyId: "3",
-    company: { id: "3", name: "GlobalTech", website: null, industry: "Manufacturing", size: null, address: null, city: null, state: null, country: null, createdAt: new Date(), updatedAt: new Date() },
+    company: { id: "3", name: "GlobalTech", website: null, industry: "Manufacturing", size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() },
     source: "Trade Show",
     ownerId: null,
     createdAt: new Date("2024-01-20"),
@@ -68,7 +68,7 @@ const sampleContacts: Contact[] = [
     title: "Product Director",
     status: ContactStatus.CUSTOMER,
     companyId: "4",
-    company: { id: "4", name: "Innovate Co", website: null, industry: "Consulting", size: null, address: null, city: null, state: null, country: null, createdAt: new Date(), updatedAt: new Date() },
+    company: { id: "4", name: "Innovate Co", website: null, industry: "Consulting", size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() },
     source: "LinkedIn",
     ownerId: null,
     createdAt: new Date("2024-01-10"),
@@ -83,7 +83,7 @@ const sampleContacts: Contact[] = [
     title: "CTO",
     status: ContactStatus.PARTNER,
     companyId: "5",
-    company: { id: "5", name: "Enterprise Net", website: null, industry: "IT Services", size: null, address: null, city: null, state: null, country: null, createdAt: new Date(), updatedAt: new Date() },
+    company: { id: "5", name: "Enterprise Net", website: null, industry: "IT Services", size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() },
     source: "Cold Email",
     ownerId: null,
     createdAt: new Date("2024-01-05"),
@@ -132,7 +132,7 @@ export default function ContactsPage() {
       companyId: data.companyId || null,
       company: data.companyId
         ? sampleCompanies.find((c) => c.id === data.companyId)
-          ? { id: data.companyId, name: sampleCompanies.find((c) => c.id === data.companyId)!.name, website: null, industry: null, size: null, address: null, city: null, state: null, country: null, createdAt: new Date(), updatedAt: new Date() }
+          ? { id: data.companyId, name: sampleCompanies.find((c) => c.id === data.companyId)!.name, website: null, industry: null, size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() }
           : undefined
         : undefined,
       source: data.source || null,

@@ -5,11 +5,26 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Get the appropriate locale for a currency
+ */
+function getLocaleForCurrency(currency: string): string {
+  const currencyLocales: Record<string, string> = {
+    GBP: "en-GB",
+    USD: "en-US",
+    EUR: "de-DE",
+    CAD: "en-CA",
+    AUD: "en-AU",
+  };
+  return currencyLocales[currency] || "en-GB";
+}
+
 export function formatCurrency(
   amount: number,
-  currency: string = "USD"
+  currency: string = "GBP"
 ): string {
-  return new Intl.NumberFormat("en-US", {
+  const locale = getLocaleForCurrency(currency);
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency,
     minimumFractionDigits: 0,
@@ -17,10 +32,51 @@ export function formatCurrency(
   }).format(amount);
 }
 
+/**
+ * Format currency with decimal places (for invoices/quotes)
+ */
+export function formatCurrencyPrecise(
+  amount: number,
+  currency: string = "GBP"
+): string {
+  const locale = getLocaleForCurrency(currency);
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+/**
+ * Format date in UK format (15 Jan 2024)
+ */
 export function formatDate(date: Date | string): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
+  return new Intl.DateTimeFormat("en-GB", {
     day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(date));
+}
+
+/**
+ * Format date in long UK format (15 January 2024)
+ */
+export function formatDateLong(date: Date | string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(date));
+}
+
+/**
+ * Format date in short UK format (15/01/2024)
+ */
+export function formatDateShort(date: Date | string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
     year: "numeric",
   }).format(new Date(date));
 }

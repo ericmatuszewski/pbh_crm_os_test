@@ -277,7 +277,7 @@ describe('Deal Schemas', () => {
       const result = createDealSchema.safeParse(deal);
       expect(result.success).toBe(true);
       if (result.success) {
-        expect(result.data.currency).toBe('USD');
+        expect(result.data.currency).toBe('GBP');
       }
     });
   });

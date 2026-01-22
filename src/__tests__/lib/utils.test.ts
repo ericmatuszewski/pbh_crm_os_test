@@ -34,24 +34,25 @@ describe('cn (className utility)', () => {
 });
 
 describe('formatCurrency', () => {
-  it('should format USD currency by default', () => {
-    expect(formatCurrency(1000)).toBe('$1,000');
+  it('should format GBP currency by default', () => {
+    expect(formatCurrency(1000)).toBe('£1,000');
   });
 
   it('should format large numbers', () => {
-    expect(formatCurrency(1234567)).toBe('$1,234,567');
+    expect(formatCurrency(1234567)).toBe('£1,234,567');
   });
 
   it('should format zero', () => {
-    expect(formatCurrency(0)).toBe('$0');
+    expect(formatCurrency(0)).toBe('£0');
   });
 
   it('should format negative numbers', () => {
-    expect(formatCurrency(-500)).toBe('-$500');
+    expect(formatCurrency(-500)).toBe('-£500');
   });
 
   it('should format EUR currency', () => {
-    expect(formatCurrency(1000, 'EUR')).toContain('1,000');
+    // EUR uses de-DE locale with period as thousand separator
+    expect(formatCurrency(1000, 'EUR')).toContain('1.000');
   });
 
   it('should format GBP currency', () => {
@@ -59,7 +60,7 @@ describe('formatCurrency', () => {
   });
 
   it('should handle small amounts', () => {
-    expect(formatCurrency(5)).toBe('$5');
+    expect(formatCurrency(5)).toBe('£5');
   });
 });
 
@@ -67,17 +68,17 @@ describe('formatDate', () => {
   it('should format Date object', () => {
     const date = new Date('2024-01-15');
     const result = formatDate(date);
-    expect(result).toMatch(/Jan 15, 2024/);
+    expect(result).toMatch(/15 Jan 2024/);
   });
 
   it('should format ISO date string', () => {
     const result = formatDate('2024-06-20');
-    expect(result).toMatch(/Jun 20, 2024/);
+    expect(result).toMatch(/20 Jun 2024/);
   });
 
   it('should format full ISO datetime string', () => {
     const result = formatDate('2024-12-25T10:30:00Z');
-    expect(result).toMatch(/Dec 25, 2024/);
+    expect(result).toMatch(/25 Dec 2024/);
   });
 });
 
@@ -115,7 +116,7 @@ describe('formatRelativeTime', () => {
   it('should return formatted date for older times', () => {
     const date = new Date('2024-01-01T12:00:00Z');
     const result = formatRelativeTime(date);
-    expect(result).toMatch(/Jan 1, 2024/);
+    expect(result).toMatch(/1 Jan 2024/);
   });
 });
 

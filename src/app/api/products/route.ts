@@ -11,7 +11,7 @@ const createProductSchema = z.object({
   type: z.enum(["PRODUCT", "SERVICE", "SUBSCRIPTION"]).default("PRODUCT"),
   status: z.enum(["ACTIVE", "INACTIVE", "DISCONTINUED"]).default("ACTIVE"),
   basePrice: z.number().min(0, "Price must be positive"),
-  currency: z.string().default("USD"),
+  currency: z.string().default("GBP"),
   pricingType: z.enum(["ONE_TIME", "RECURRING_MONTHLY", "RECURRING_YEARLY", "USAGE_BASED"]).default("ONE_TIME"),
   category: z.string().optional().or(z.literal("")),
   tags: z.array(z.string()).optional().default([]),

@@ -11,7 +11,7 @@ export async function GET(
       where: { id: params.id },
       include: {
         contact: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
-        company: { select: { id: true, name: true, address: true, city: true, state: true, country: true } },
+        company: { select: { id: true, name: true, address: true, city: true, county: true, postcode: true, country: true } },
         deal: { select: { id: true, title: true, value: true } },
         createdBy: { select: { id: true, name: true, email: true } },
         items: { orderBy: { sortOrder: "asc" } },

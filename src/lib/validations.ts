@@ -23,7 +23,8 @@ export const createCompanySchema = z.object({
   size: z.enum(["STARTUP", "SMALL", "MEDIUM", "ENTERPRISE"]).optional().nullable(),
   address: z.string().max(500).optional().or(z.literal("")),
   city: z.string().max(100).optional().or(z.literal("")),
-  state: z.string().max(100).optional().or(z.literal("")),
+  county: z.string().max(100).optional().or(z.literal("")),
+  postcode: z.string().max(15).optional().or(z.literal("")),
   country: z.string().max(100).optional().or(z.literal("")),
 });
 
@@ -33,7 +34,7 @@ export const updateCompanySchema = createCompanySchema.partial();
 export const createDealSchema = z.object({
   title: z.string().min(1, "Deal title is required").max(200),
   value: z.number().min(0, "Value must be positive"),
-  currency: z.string().default("USD"),
+  currency: z.string().default("GBP"),
   stage: z.enum([
     "QUALIFICATION",
     "DISCOVERY",
@@ -134,7 +135,7 @@ export const createQuoteSchema = z.object({
   companyId: z.string().optional().or(z.literal("")),
   dealId: z.string().optional().or(z.literal("")),
   validUntil: z.string().min(1, "Valid until date is required"),
-  currency: z.string().default("USD"),
+  currency: z.string().default("GBP"),
   discountType: z.enum(["percentage", "fixed"]).optional().nullable(),
   discountValue: z.number().min(0).optional().nullable(),
   taxRate: z.number().min(0).max(100).optional().nullable(),

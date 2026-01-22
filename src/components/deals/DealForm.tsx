@@ -29,7 +29,7 @@ import { Loader2 } from "lucide-react";
 const dealSchema = z.object({
   title: z.string().min(1, "Deal title is required"),
   value: z.number().min(0, "Value must be positive"),
-  currency: z.string().default("USD"),
+  currency: z.string().default("GBP"),
   stage: z.nativeEnum(DealStage).optional(),
   probability: z.number().min(0).max(100).optional(),
   expectedCloseDate: z.string().optional(),

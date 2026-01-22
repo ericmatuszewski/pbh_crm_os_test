@@ -117,7 +117,8 @@ export interface Company {
   size: CompanySize | null;
   address: string | null;
   city: string | null;
-  state: string | null;
+  county: string | null;
+  postcode: string | null;
   country: string | null;
   createdAt: Date;
   updatedAt: Date;

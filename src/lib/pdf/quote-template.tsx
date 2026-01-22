@@ -337,14 +337,14 @@ export function QuotePDF({
           <View style={styles.headerRight}>
             <Text style={[styles.quoteTitle, { color: primaryColor }]}>QUOTE</Text>
             <Text style={styles.quoteNumber}>{quoteNumber}</Text>
-            <Text style={styles.quoteDate}>Issued: {format(issueDate, "MMMM d, yyyy")}</Text>
+            <Text style={styles.quoteDate}>Issued: {format(issueDate, "d MMMM yyyy")}</Text>
           </View>
         </View>
 
         {/* Valid Until Notice */}
         <View style={styles.validUntil}>
           <Text style={styles.validUntilText}>
-            This quote is valid until {format(validUntil, "MMMM d, yyyy")}
+            This quote is valid until {format(validUntil, "d MMMM yyyy")}
           </Text>
         </View>
 

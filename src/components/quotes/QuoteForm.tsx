@@ -24,7 +24,7 @@ const formSchema = z.object({
   contactId: z.string().optional(),
   companyId: z.string().optional(),
   validUntil: z.string().min(1, "Valid until date is required"),
-  currency: z.string().default("USD"),
+  currency: z.string().default("GBP"),
   discountType: z.enum(["percentage", "fixed", "none"]).default("none"),
   discountValue: z.number().min(0).optional(),
   taxRate: z.number().min(0).max(100).optional(),
