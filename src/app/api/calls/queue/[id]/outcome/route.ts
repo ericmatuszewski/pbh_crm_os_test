@@ -60,13 +60,21 @@ export async function PATCH(
       },
     });
 
+    // Validate that we have a user attribution for the call
+    if (!existingItem.assignedToId) {
+      return NextResponse.json(
+        { success: false, error: { code: "VALIDATION_ERROR", message: "This call has no assigned agent. Please assign an agent before recording the outcome." } },
+        { status: 400 }
+      );
+    }
+
     // Create activity record for the call
     await prisma.activity.create({
       data: {
         type: "CALL",
         title: `Campaign call with ${existingItem.contact.firstName} ${existingItem.contact.lastName}`,
         description: data.notes || `Call outcome: ${data.outcome}`,
-        userId: existingItem.assignedToId || "system",
+        userId: existingItem.assignedToId,
         contactId: existingItem.contactId,
       },
     });
@@ -102,8 +110,11 @@ export async function PATCH(
   } catch (error) {
     console.error("Error recording outcome:", error);
     if (error instanceof Error && error.name === "ZodError") {
+      // Extract specific validation messages
+      const zodError = error as { errors?: Array<{ message: string; path: string[] }> };
+      const messages = zodError.errors?.map(e => e.message).join(". ") || "Invalid input data";
       return NextResponse.json(
-        { success: false, error: { code: "VALIDATION_ERROR", message: "Invalid input data" } },
+        { success: false, error: { code: "VALIDATION_ERROR", message: messages } },
         { status: 400 }
       );
     }

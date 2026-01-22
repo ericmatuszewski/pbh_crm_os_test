@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validTypes = ["email", "report", "import", "export", "webhook_retry", "cleanup", "notification", "workflow"];
+    const validTypes = ["email", "report", "import", "export", "webhook_retry", "cleanup", "notification", "workflow", "email_sync", "email_delta_sync", "subscription_renewal", "call_timeout"];
     if (!validTypes.includes(body.type)) {
       return NextResponse.json(
         {

@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { MetricsCard } from "@/components/dashboard/MetricsCard";
+import { OnboardingChecklist } from "@/components/onboarding";
 import {
   DollarSign,
   Users,
@@ -26,6 +27,11 @@ export default function DashboardPage() {
           }
         />
         <main className="flex-1 overflow-y-auto p-6">
+          {/* Onboarding Checklist for new agents */}
+          <div className="mb-6">
+            <OnboardingChecklist />
+          </div>
+
           {/* Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <MetricsCard

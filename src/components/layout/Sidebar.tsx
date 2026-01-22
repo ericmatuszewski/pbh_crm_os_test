@@ -23,6 +23,7 @@ import {
   Search,
   FolderOpen,
   SlidersHorizontal,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ const navigation = [
 ];
 
 const bottomNavigation = [
+  { name: "Help & Training", href: "/help", icon: HelpCircle },
   { name: "Control Panel", href: "/admin", icon: SlidersHorizontal },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

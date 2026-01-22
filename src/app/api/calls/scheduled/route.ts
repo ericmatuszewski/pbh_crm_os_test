@@ -91,11 +91,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = createScheduledCallSchema.parse(body);
 
+    // Validate that assignedToId is provided - no system fallback allowed
+    if (!data.assignedToId) {
+      return NextResponse.json(
+        { success: false, error: { code: "VALIDATION_ERROR", message: "Assigned agent is required. Please select who will make this call." } },
+        { status: 400 }
+      );
+    }
+
     const call = await prisma.scheduledCall.create({
       data: {
         contactId: data.contactId,
         scheduledAt: new Date(data.scheduledAt),
-        assignedToId: data.assignedToId || "system", // TODO: Get from auth session
+        assignedToId: data.assignedToId,
         reminderMinutes: data.reminderMinutes || null,
         notes: data.notes || null,
       },

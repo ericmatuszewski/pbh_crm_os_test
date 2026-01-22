@@ -76,8 +76,11 @@ export async function PATCH(
   } catch (error) {
     console.error("Error completing call:", error);
     if (error instanceof Error && error.name === "ZodError") {
+      // Extract specific validation messages
+      const zodError = error as { errors?: Array<{ message: string; path: string[] }> };
+      const messages = zodError.errors?.map(e => e.message).join(". ") || "Invalid input data";
       return NextResponse.json(
-        { success: false, error: { code: "VALIDATION_ERROR", message: "Invalid input data" } },
+        { success: false, error: { code: "VALIDATION_ERROR", message: messages } },
         { status: 400 }
       );
     }

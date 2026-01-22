@@ -24,7 +24,8 @@ export type JobType =
   | "workflow"
   | "email_sync"
   | "email_delta_sync"
-  | "subscription_renewal";
+  | "subscription_renewal"
+  | "call_timeout";
 
 export interface JobPayload {
   [key: string]: unknown;
@@ -708,6 +709,69 @@ registerHandler("subscription_renewal", async (payload, updateProgress) => {
     await updateProgress(100, `Renewed ${renewed}, failed ${failed}`);
 
     return { success: true, data: { renewed, failed } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, error: message };
+  }
+});
+
+// Call timeout handler - Mark overdue scheduled calls as MISSED
+registerHandler("call_timeout", async (payload, updateProgress) => {
+  const { hoursOverdue = 2 } = payload;
+
+  await updateProgress(10, "Finding overdue calls");
+
+  try {
+    // Find calls that are still SCHEDULED but past their scheduled time by X hours
+    const cutoffTime = new Date(Date.now() - (hoursOverdue as number) * 60 * 60 * 1000);
+
+    const overdueCalls = await prisma.scheduledCall.findMany({
+      where: {
+        status: "SCHEDULED",
+        scheduledAt: { lt: cutoffTime },
+      },
+      include: {
+        contact: { select: { firstName: true, lastName: true } },
+        assignedTo: { select: { name: true } },
+      },
+    });
+
+    await updateProgress(30, `Found ${overdueCalls.length} overdue calls`);
+
+    let marked = 0;
+    for (const call of overdueCalls) {
+      await prisma.scheduledCall.update({
+        where: { id: call.id },
+        data: {
+          status: "MISSED",
+          notes: call.notes
+            ? `${call.notes}\n\n[Auto-marked as MISSED - call was ${hoursOverdue}+ hours overdue]`
+            : `[Auto-marked as MISSED - call was ${hoursOverdue}+ hours overdue]`,
+        },
+      });
+
+      // Create notification for the assigned user if available
+      if (call.assignedToId) {
+        await prisma.notification.create({
+          data: {
+            userId: call.assignedToId,
+            type: "TASK_OVERDUE",
+            title: "Missed Call Alert",
+            message: `Call with ${call.contact.firstName} ${call.contact.lastName} was marked as missed (${hoursOverdue}+ hours overdue)`,
+            priority: "HIGH",
+            entityType: "ScheduledCall",
+            entityId: call.id,
+            link: `/calls`,
+          },
+        });
+      }
+
+      marked++;
+    }
+
+    await updateProgress(100, `Marked ${marked} calls as missed`);
+
+    return { success: true, data: { marked, total: overdueCalls.length } };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return { success: false, error: message };

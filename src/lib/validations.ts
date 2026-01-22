@@ -166,10 +166,17 @@ export const quoteFiltersSchema = paginationSchema.extend({
 
 // ==================== CALL SCHEDULING VALIDATION SCHEMAS ====================
 
+// Outcomes that require notes to document the reason
+const OUTCOMES_REQUIRING_NOTES = [
+  "NOT_INTERESTED",
+  "WRONG_NUMBER",
+  "DO_NOT_CALL",
+] as const;
+
 export const createScheduledCallSchema = z.object({
   contactId: z.string().min(1, "Contact is required"),
   scheduledAt: z.string().min(1, "Scheduled time is required"),
-  assignedToId: z.string().optional(),
+  assignedToId: z.string().min(1, "Assigned agent is required"), // Required - no system fallback
   reminderMinutes: z.number().int().min(5).max(1440).optional().nullable(), // 5 min to 24 hours
   notes: z.string().max(1000).optional().or(z.literal("")),
 });
@@ -188,9 +195,21 @@ export const completeCallSchema = z.object({
     "DO_NOT_CALL",
   ]),
   notes: z.string().max(2000).optional().or(z.literal("")),
-  duration: z.number().int().min(0).optional(), // minutes
+  duration: z.number().int().min(0).max(480).optional(), // Max 8 hours (480 minutes)
   callbackAt: z.string().optional(), // For CALLBACK_REQUESTED
-});
+}).refine(
+  (data) => {
+    // Require notes for negative outcomes
+    if (OUTCOMES_REQUIRING_NOTES.includes(data.outcome as typeof OUTCOMES_REQUIRING_NOTES[number])) {
+      return data.notes && data.notes.trim().length >= 10;
+    }
+    return true;
+  },
+  {
+    message: "Notes are required (min 10 characters) when marking a call as Not Interested, Wrong Number, or Do Not Call",
+    path: ["notes"],
+  }
+);
 
 export const scheduledCallFiltersSchema = paginationSchema.extend({
   assignedToId: z.string().nullish(),
