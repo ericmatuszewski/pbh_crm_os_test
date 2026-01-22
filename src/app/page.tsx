@@ -112,6 +112,23 @@ export default function DashboardPage() {
     } catch {
       // Network error, show demo values
       setIsDemo(true);
+      setStats({
+        totalRevenue: 284500,
+        activeDeals: 24,
+        dealsClosingThisMonth: 8,
+        newContacts: 142,
+        conversionRate: 24.8,
+        revenueTrend: 12.5,
+        dealsTrend: 8.2,
+        contactsTrend: 5.1,
+        conversionTrend: 2.7,
+        pipeline: [
+          { stage: "Qualification", count: 8, value: 45000 },
+          { stage: "Discovery", count: 6, value: 78000 },
+          { stage: "Proposal", count: 5, value: 120000 },
+          { stage: "Negotiation", count: 3, value: 95000 },
+        ],
+      });
     } finally {
       setLoading(false);
     }
