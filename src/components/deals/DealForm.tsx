@@ -167,7 +167,7 @@ export function DealForm({
                 value={watch("currency") || "USD"}
                 onValueChange={(value) => setValue("currency", value)}
               >
-                <SelectTrigger>
+                <SelectTrigger id="currency">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -187,7 +187,7 @@ export function DealForm({
                 value={watch("stage") || DealStage.QUALIFICATION}
                 onValueChange={(value) => handleStageChange(value as DealStage)}
               >
-                <SelectTrigger>
+                <SelectTrigger id="stage">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

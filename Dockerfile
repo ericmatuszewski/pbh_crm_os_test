@@ -45,10 +45,19 @@ CMD ["npm", "run", "dev"]
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+# Container metadata
+LABEL org.opencontainers.image.title="PBH CRM"
+LABEL org.opencontainers.image.description="Enterprise-grade Sales CRM"
+LABEL org.opencontainers.image.vendor="PBH"
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache libc6-compat
+# Install runtime dependencies
+# - libc6-compat: Required for some Node.js native modules
+# - netcat-openbsd: Used by entrypoint.sh for service health checks
+# - openssl: Required for Prisma
+RUN apk add --no-cache libc6-compat netcat-openbsd openssl
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs

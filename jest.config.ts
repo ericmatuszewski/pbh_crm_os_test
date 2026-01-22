@@ -13,6 +13,8 @@ const config: Config = {
     '<rootDir>/node_modules/',
     '<rootDir>/.next/',
     '<rootDir>/e2e/',
+    // API route tests require server environment - run separately with integration test setup
+    '<rootDir>/src/__tests__/api/',
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',

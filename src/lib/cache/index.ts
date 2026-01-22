@@ -7,11 +7,13 @@
  * - Pattern-based invalidation
  * - Cache-aside pattern helpers
  * - Memoization utilities
+ * - Automatic fallback to in-memory when Redis unavailable
  */
 
 import { prisma } from "@/lib/prisma";
+import Redis from "ioredis";
 
-// Cache entry structure
+// Cache entry structure (for in-memory)
 interface CacheEntry<T> {
   value: T;
   expiresAt: number;
@@ -24,6 +26,7 @@ const memoryCache = new Map<string, CacheEntry<unknown>>();
 // Cache configuration
 const DEFAULT_TTL = 300; // 5 minutes in seconds
 const MAX_MEMORY_ENTRIES = 10000;
+const CACHE_PREFIX = "pbh:";
 
 // ==================== CACHE PROVIDERS ====================
 
@@ -33,6 +36,7 @@ interface CacheProvider {
   delete(key: string): Promise<void>;
   deletePattern(pattern: string): Promise<number>;
   clear(): Promise<void>;
+  isConnected(): boolean;
 }
 
 // In-Memory Cache Provider
@@ -85,19 +89,210 @@ class MemoryCacheProvider implements CacheProvider {
   async clear(): Promise<void> {
     memoryCache.clear();
   }
+
+  isConnected(): boolean {
+    return true; // Memory is always available
+  }
 }
 
-// Redis Cache Provider placeholder
-// To enable Redis caching:
-// 1. Install ioredis: npm install ioredis
-// 2. Set REDIS_URL environment variable
-// 3. Uncomment and implement the RedisCacheProvider class
-// For now, we use the in-memory cache which works great for single-instance deployments
+// Redis Cache Provider
+class RedisCacheProvider implements CacheProvider {
+  private client: Redis | null = null;
+  private connected: boolean = false;
+
+  constructor() {
+    const redisUrl = process.env.REDIS_URL;
+
+    if (redisUrl) {
+      try {
+        this.client = new Redis(redisUrl, {
+          maxRetriesPerRequest: 3,
+          retryStrategy(times) {
+            if (times > 3) {
+              console.warn("Redis connection failed, falling back to memory cache");
+              return null; // Stop retrying
+            }
+            return Math.min(times * 200, 2000);
+          },
+          lazyConnect: true,
+        });
+
+        this.client.on("connect", () => {
+          console.log("Redis connected");
+          this.connected = true;
+        });
+
+        this.client.on("error", (err) => {
+          console.warn("Redis error:", err.message);
+          this.connected = false;
+        });
+
+        this.client.on("close", () => {
+          this.connected = false;
+        });
+
+        // Connect immediately
+        this.client.connect().catch(() => {
+          console.warn("Redis initial connection failed, using memory cache");
+        });
+      } catch (error) {
+        console.warn("Redis initialization failed:", error);
+        this.client = null;
+      }
+    }
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    if (!this.client || !this.connected) return null;
+
+    try {
+      const value = await this.client.get(CACHE_PREFIX + key);
+      if (!value) return null;
+      return JSON.parse(value) as T;
+    } catch (error) {
+      console.warn("Redis get error:", error);
+      return null;
+    }
+  }
+
+  async set<T>(key: string, value: T, ttlSeconds: number = DEFAULT_TTL): Promise<void> {
+    if (!this.client || !this.connected) return;
+
+    try {
+      await this.client.setex(
+        CACHE_PREFIX + key,
+        ttlSeconds,
+        JSON.stringify(value)
+      );
+    } catch (error) {
+      console.warn("Redis set error:", error);
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    if (!this.client || !this.connected) return;
+
+    try {
+      await this.client.del(CACHE_PREFIX + key);
+    } catch (error) {
+      console.warn("Redis delete error:", error);
+    }
+  }
+
+  async deletePattern(pattern: string): Promise<number> {
+    if (!this.client || !this.connected) return 0;
+
+    try {
+      const keys = await this.client.keys(CACHE_PREFIX + pattern);
+      if (keys.length === 0) return 0;
+
+      const pipeline = this.client.pipeline();
+      keys.forEach((key) => pipeline.del(key));
+      await pipeline.exec();
+
+      return keys.length;
+    } catch (error) {
+      console.warn("Redis deletePattern error:", error);
+      return 0;
+    }
+  }
+
+  async clear(): Promise<void> {
+    if (!this.client || !this.connected) return;
+
+    try {
+      const keys = await this.client.keys(CACHE_PREFIX + "*");
+      if (keys.length === 0) return;
+
+      const pipeline = this.client.pipeline();
+      keys.forEach((key) => pipeline.del(key));
+      await pipeline.exec();
+    } catch (error) {
+      console.warn("Redis clear error:", error);
+    }
+  }
+
+  isConnected(): boolean {
+    return this.connected;
+  }
+
+  async ping(): Promise<boolean> {
+    if (!this.client) return false;
+    try {
+      const result = await this.client.ping();
+      return result === "PONG";
+    } catch {
+      return false;
+    }
+  }
+}
+
+// ==================== HYBRID CACHE (Redis + Memory fallback) ====================
+
+class HybridCacheProvider implements CacheProvider {
+  private redis: RedisCacheProvider;
+  private memory: MemoryCacheProvider;
+
+  constructor() {
+    this.redis = new RedisCacheProvider();
+    this.memory = new MemoryCacheProvider();
+  }
+
+  private get provider(): CacheProvider {
+    return this.redis.isConnected() ? this.redis : this.memory;
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    // Try Redis first, fall back to memory
+    if (this.redis.isConnected()) {
+      const result = await this.redis.get<T>(key);
+      if (result !== null) return result;
+    }
+    return this.memory.get<T>(key);
+  }
+
+  async set<T>(key: string, value: T, ttlSeconds: number = DEFAULT_TTL): Promise<void> {
+    // Write to both for redundancy
+    await Promise.all([
+      this.redis.set(key, value, ttlSeconds),
+      this.memory.set(key, value, ttlSeconds),
+    ]);
+  }
+
+  async delete(key: string): Promise<void> {
+    await Promise.all([
+      this.redis.delete(key),
+      this.memory.delete(key),
+    ]);
+  }
+
+  async deletePattern(pattern: string): Promise<number> {
+    const [redisCount, memoryCount] = await Promise.all([
+      this.redis.deletePattern(pattern),
+      this.memory.deletePattern(pattern),
+    ]);
+    return Math.max(redisCount, memoryCount);
+  }
+
+  async clear(): Promise<void> {
+    await Promise.all([
+      this.redis.clear(),
+      this.memory.clear(),
+    ]);
+  }
+
+  isConnected(): boolean {
+    return true; // Hybrid always works (memory fallback)
+  }
+
+  isRedisConnected(): boolean {
+    return this.redis.isConnected();
+  }
+}
 
 // ==================== CACHE INSTANCE ====================
 
-// Using in-memory cache - for Redis support, implement RedisCacheProvider
-const cacheProvider: CacheProvider = new MemoryCacheProvider();
+const cacheProvider = new HybridCacheProvider();
 
 // ==================== CACHE API ====================
 
@@ -172,6 +367,13 @@ export const cache = {
       const key = keyFn(...args);
       return cache.getOrSet(key, () => fn(...args), ttlSeconds);
     };
+  },
+
+  /**
+   * Check if Redis is connected
+   */
+  isRedisConnected(): boolean {
+    return cacheProvider.isRedisConnected();
   },
 };
 
@@ -264,10 +466,24 @@ export async function warmCache(): Promise<void> {
     });
     await cache.set(cacheKeys.products(), products, 3600);
 
-    console.log("Cache warmed successfully");
+    console.log(`Cache warmed successfully (Redis: ${cache.isRedisConnected() ? "connected" : "memory fallback"})`);
   } catch (error) {
     console.error("Cache warming failed:", error);
   }
+}
+
+// ==================== CACHE STATS ====================
+
+export async function getCacheStats(): Promise<{
+  provider: "redis" | "memory";
+  memoryEntries: number;
+  redisConnected: boolean;
+}> {
+  return {
+    provider: cacheProvider.isRedisConnected() ? "redis" : "memory",
+    memoryEntries: memoryCache.size,
+    redisConnected: cacheProvider.isRedisConnected(),
+  };
 }
 
 export default cache;

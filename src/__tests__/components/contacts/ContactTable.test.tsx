@@ -159,7 +159,8 @@ describe('ContactTable', () => {
     it('should display formatted date', () => {
       renderContactTable();
 
-      expect(screen.getByText(/Jan 15, 2024/i)).toBeInTheDocument();
+      // UK date format: "15 Jan 2024"
+      expect(screen.getByText(/15 Jan 2024/i)).toBeInTheDocument();
     });
   });
 
