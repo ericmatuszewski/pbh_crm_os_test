@@ -7,8 +7,13 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Sales CRM",
-  description: "A modern CRM system for sales teams",
+  title: "PBH Sales CRM",
+  description: "Enterprise CRM system for PBH Holdings",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

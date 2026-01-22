@@ -22,6 +22,7 @@ import {
   Bell,
   Search,
   FolderOpen,
+  SlidersHorizontal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ const navigation = [
 ];
 
 const bottomNavigation = [
+  { name: "Control Panel", href: "/admin", icon: SlidersHorizontal },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -64,11 +66,11 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex items-center h-16 px-4 border-b border-slate-700">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center font-bold">
-            S
+          <div className="w-8 h-8 bg-[#2563eb] rounded-lg flex items-center justify-center font-bold text-white text-xs">
+            PBH
           </div>
           {!collapsed && (
-            <span className="text-lg font-semibold">Sales CRM</span>
+            <span className="text-lg font-semibold">PBH CRM</span>
           )}
         </div>
       </div>

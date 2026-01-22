@@ -1,0 +1,6 @@
+<svg width="200" height="50" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- PBH Logo -->
+  <rect width="50" height="50" rx="8" fill="#2563eb"/>
+  <text x="25" y="34" font-family="Arial, sans-serif" font-weight="bold" font-size="22" fill="white" text-anchor="middle">PBH</text>
+  <text x="60" y="32" font-family="Arial, sans-serif" font-weight="600" font-size="20" fill="#1e293b">Sales CRM</text>
+</svg>

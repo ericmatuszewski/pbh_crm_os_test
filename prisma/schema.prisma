@@ -3657,3 +3657,58 @@ model MailboxSyncLog {
   @@index([status])
   @@index([startedAt])
 }
+
+// ==================== SYSTEM CONFIGURATION ====================
+
+// System-wide settings (singleton table)
+model SystemSettings {
+  id                      String    @id @default("system")
+
+  // Mail Server Configuration
+  smtpHost                String?
+  smtpPort                Int       @default(587)
+  smtpUser                String?
+  smtpPassword            String?   // Encrypted
+  smtpFromEmail           String?
+  smtpFromName            String    @default("PBH CRM")
+  smtpSecure              Boolean   @default(true)
+
+  // Microsoft 365 Integration
+  microsoftClientId       String?
+  microsoftClientSecret   String?   // Encrypted
+  microsoftTenantId       String    @default("common")
+  microsoftRedirectUri    String?
+
+  // Application Branding
+  appName                 String    @default("PBH Sales CRM")
+  appTagline              String    @default("Enterprise CRM for Sales Teams")
+  primaryColor            String    @default("#2563eb")
+  secondaryColor          String    @default("#64748b")
+  logoUrl                 String?
+  faviconUrl              String?
+
+  // Security Settings
+  sessionTimeout          Int       @default(30)      // minutes
+  maxLoginAttempts        Int       @default(5)
+  requireMfa              Boolean   @default(false)
+  passwordMinLength       Int       @default(8)
+  passwordRequireSpecial  Boolean   @default(true)
+
+  // Feature Toggles
+  enableEmailIntegration  Boolean   @default(true)
+  enableDocumentStorage   Boolean   @default(true)
+  enableAuditLog          Boolean   @default(true)
+  enableApiAccess         Boolean   @default(true)
+  enableWebhooks          Boolean   @default(true)
+
+  // Storage Configuration
+  storageProvider         String    @default("local")  // local, s3, azure, gcs
+  s3Bucket                String?
+  s3Region                String    @default("eu-west-2")
+  s3AccessKey             String?   // Encrypted
+  s3SecretKey             String?   // Encrypted
+  maxUploadSize           Int       @default(10)       // MB
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
