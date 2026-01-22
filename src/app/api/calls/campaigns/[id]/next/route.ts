@@ -17,11 +17,12 @@ export async function GET(
       );
     }
 
-    // Find next contact in queue (scheduled, ordered by position)
+    // Find next contacts in queue (scheduled, ordered by position)
+    // Fetch 2 items: current contact + prefetch for next
     // Also include callbacks that are due
     const now = new Date();
 
-    const nextItem = await prisma.callQueueItem.findFirst({
+    const items = await prisma.callQueueItem.findMany({
       where: {
         campaignId: params.id,
         status: "SCHEDULED",
@@ -48,17 +49,24 @@ export async function GET(
         { callbackAt: "asc" }, // Callbacks first
         { position: "asc" },
       ],
+      take: 2, // Current + prefetch
     });
 
-    if (!nextItem) {
+    if (items.length === 0) {
       return NextResponse.json({
         success: true,
         data: null,
+        prefetch: null,
         message: "No more contacts in queue",
       });
     }
 
-    return NextResponse.json({ success: true, data: nextItem });
+    // Return current contact and prefetch the next one
+    return NextResponse.json({
+      success: true,
+      data: items[0],
+      prefetch: items[1] || null,
+    });
   } catch (error) {
     console.error("Error fetching next contact:", error);
     return NextResponse.json(

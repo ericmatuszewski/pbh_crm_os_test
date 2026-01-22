@@ -645,6 +645,8 @@ model Activity {
   @@index([dealId])
   @@index([createdAt])
   @@index([businessId])
+  @@index([userId, createdAt])   // User activity history
+  @@index([type, createdAt])     // Activity type queries
 }
 
 model Note {
@@ -800,6 +802,8 @@ model ScheduledCall {
   @@index([contactId])
   @@index([status])
   @@index([businessId])
+  @@index([assignedToId, scheduledAt])  // Agent daily calls lookup
+  @@index([status, scheduledAt])        // Status + date filtering
 }
 
 model CallCampaign {
@@ -864,6 +868,9 @@ model CallQueueItem {
   @@index([campaignId, position])
   @@index([status])
   @@index([assignedToId])
+  @@index([campaignId, callbackAt])   // Callback ordering for next contact
+  @@index([campaignId, status])       // Status filtering within campaign
+  @@index([assignedToId, status])     // Agent's active queue items
 }
 
 // ==================== PRODUCT CATALOG ====================

@@ -18,6 +18,7 @@ import {
 import { DailyCallList } from "@/components/calls/DailyCallList";
 import { ScheduleCallForm } from "@/components/calls/ScheduleCallForm";
 import { CallOutcomeDialog } from "@/components/calls/CallOutcomeDialog";
+import { AgentDashboard } from "@/components/calls/AgentDashboard";
 
 interface ScheduledCall {
   id: string;
@@ -82,6 +83,9 @@ export default function CallsPage() {
         />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="space-y-6">
+            {/* Agent Dashboard - Daily Progress */}
+            <AgentDashboard refreshTrigger={refreshKey} />
+
             {/* Quick Actions */}
             <div className="grid gap-4 md:grid-cols-3">
               <Link href="/calls/schedule">
