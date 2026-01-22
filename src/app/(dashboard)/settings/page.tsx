@@ -101,7 +101,7 @@ const settingsSections = [
     description: "Connect third-party apps and configure webhooks",
     href: "/settings/integrations",
     icon: Webhook,
-    badge: "Coming Soon",
+    badge: null,
   },
   {
     title: "Appearance",
