@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { ContactTable } from "@/components/contacts/ContactTable";
 import { ContactFilters } from "@/components/contacts/ContactFilters";
 import { ContactForm } from "@/components/contacts/ContactForm";
+import { ImportDialog } from "@/components/import";
 import { EmptyState } from "@/components/shared";
-import { Plus, Users } from "lucide-react";
+import { Plus, Users, Upload } from "lucide-react";
 import { Contact, ContactStatus, CreateContactInput } from "@/types";
 
 // Sample data for demonstration
@@ -103,6 +104,7 @@ export default function ContactsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
 
   // Filter contacts
@@ -187,10 +189,16 @@ export default function ContactsPage() {
           title="Contacts"
           subtitle={`${contacts.length} total contacts`}
           actions={
-            <Button onClick={() => setIsFormOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Contact
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsImportOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Import
+              </Button>
+              <Button onClick={() => setIsFormOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Contact
+              </Button>
+            </div>
           }
         />
         <main className="flex-1 overflow-y-auto p-6">
@@ -254,6 +262,15 @@ export default function ContactsPage() {
         }
         companies={sampleCompanies}
         isEdit={!!editingContact}
+      />
+
+      <ImportDialog
+        open={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImportComplete={() => {
+          // In a real app, you would refetch contacts here
+          setIsImportOpen(false);
+        }}
       />
     </div>
   );

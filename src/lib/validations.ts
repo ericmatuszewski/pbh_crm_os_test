@@ -47,6 +47,8 @@ export const createDealSchema = z.object({
   contactId: z.string().optional().or(z.literal("")),
   companyId: z.string().optional().or(z.literal("")),
   ownerId: z.string().min(1, "Owner is required"),
+  pipelineId: z.string().optional().nullable(),
+  stageId: z.string().optional().nullable(),
 });
 
 export const updateDealSchema = createDealSchema.partial();
@@ -86,18 +88,18 @@ export const createNoteSchema = z.object({
 
 // Query parameter schemas
 export const paginationSchema = z.object({
-  page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  page: z.preprocess((val) => (val === null || val === "" ? undefined : val), z.coerce.number().min(1).default(1)),
+  limit: z.preprocess((val) => (val === null || val === "" ? undefined : val), z.coerce.number().min(1).max(100).default(20)),
 });
 
 export const contactFiltersSchema = paginationSchema.extend({
-  search: z.string().optional(),
-  status: z.enum(["LEAD", "QUALIFIED", "CUSTOMER", "CHURNED", "PARTNER"]).optional(),
-  companyId: z.string().optional(),
+  search: z.string().nullish(),
+  status: z.enum(["LEAD", "QUALIFIED", "CUSTOMER", "CHURNED", "PARTNER"]).nullish(),
+  companyId: z.string().nullish(),
 });
 
 export const dealFiltersSchema = paginationSchema.extend({
-  search: z.string().optional(),
+  search: z.string().nullish(),
   stage: z.enum([
     "QUALIFICATION",
     "DISCOVERY",
@@ -105,16 +107,161 @@ export const dealFiltersSchema = paginationSchema.extend({
     "NEGOTIATION",
     "CLOSED_WON",
     "CLOSED_LOST",
-  ]).optional(),
-  ownerId: z.string().optional(),
-  minValue: z.coerce.number().optional(),
-  maxValue: z.coerce.number().optional(),
+  ]).nullish(),
+  ownerId: z.string().nullish(),
+  minValue: z.preprocess((val) => (val === null || val === "" ? undefined : val), z.coerce.number().optional()),
+  maxValue: z.preprocess((val) => (val === null || val === "" ? undefined : val), z.coerce.number().optional()),
 });
 
 export const taskFiltersSchema = paginationSchema.extend({
-  status: z.enum(["TODO", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).optional(),
-  assigneeId: z.string().optional(),
+  status: z.enum(["TODO", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).nullish(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).nullish(),
+  assigneeId: z.string().nullish(),
+});
+
+// ==================== QUOTE VALIDATION SCHEMAS ====================
+
+export const createQuoteItemSchema = z.object({
+  name: z.string().min(1, "Item name is required").max(200),
+  description: z.string().max(1000).optional().or(z.literal("")),
+  quantity: z.number().min(0.01, "Quantity must be greater than 0"),
+  unitPrice: z.number().min(0, "Unit price must be positive"),
+});
+
+export const createQuoteSchema = z.object({
+  title: z.string().min(1, "Quote title is required").max(200),
+  contactId: z.string().optional().or(z.literal("")),
+  companyId: z.string().optional().or(z.literal("")),
+  dealId: z.string().optional().or(z.literal("")),
+  validUntil: z.string().min(1, "Valid until date is required"),
+  currency: z.string().default("USD"),
+  discountType: z.enum(["percentage", "fixed"]).optional().nullable(),
+  discountValue: z.number().min(0).optional().nullable(),
+  taxRate: z.number().min(0).max(100).optional().nullable(),
+  termsConditions: z.string().max(5000).optional().or(z.literal("")),
+  paymentTerms: z.string().max(500).optional().or(z.literal("")),
+  notes: z.string().max(2000).optional().or(z.literal("")),
+  logoUrl: z.string().url().optional().or(z.literal("")),
+  companyName: z.string().max(200).optional().or(z.literal("")),
+  companyAddress: z.string().max(500).optional().or(z.literal("")),
+  items: z.array(createQuoteItemSchema).min(1, "At least one line item is required"),
+});
+
+export const updateQuoteSchema = createQuoteSchema.partial().extend({
+  items: z.array(createQuoteItemSchema).min(1, "At least one line item is required").optional(),
+});
+
+export const updateQuoteStatusSchema = z.object({
+  status: z.enum(["DRAFT", "SENT", "ACCEPTED", "DECLINED", "EXPIRED"]),
+});
+
+export const quoteFiltersSchema = paginationSchema.extend({
+  search: z.string().nullish(),
+  status: z.enum(["DRAFT", "SENT", "ACCEPTED", "DECLINED", "EXPIRED"]).nullish(),
+  contactId: z.string().nullish(),
+  companyId: z.string().nullish(),
+  dealId: z.string().nullish(),
+});
+
+// ==================== CALL SCHEDULING VALIDATION SCHEMAS ====================
+
+export const createScheduledCallSchema = z.object({
+  contactId: z.string().min(1, "Contact is required"),
+  scheduledAt: z.string().min(1, "Scheduled time is required"),
+  assignedToId: z.string().optional(),
+  reminderMinutes: z.number().int().min(5).max(1440).optional().nullable(), // 5 min to 24 hours
+  notes: z.string().max(1000).optional().or(z.literal("")),
+});
+
+export const updateScheduledCallSchema = createScheduledCallSchema.partial();
+
+export const completeCallSchema = z.object({
+  outcome: z.enum([
+    "ANSWERED",
+    "NO_ANSWER",
+    "VOICEMAIL",
+    "BUSY",
+    "CALLBACK_REQUESTED",
+    "NOT_INTERESTED",
+    "WRONG_NUMBER",
+    "DO_NOT_CALL",
+  ]),
+  notes: z.string().max(2000).optional().or(z.literal("")),
+  duration: z.number().int().min(0).optional(), // minutes
+  callbackAt: z.string().optional(), // For CALLBACK_REQUESTED
+});
+
+export const scheduledCallFiltersSchema = paginationSchema.extend({
+  assignedToId: z.string().nullish(),
+  status: z.enum(["SCHEDULED", "COMPLETED", "CANCELLED", "MISSED"]).nullish(),
+  date: z.string().nullish(),
+  startDate: z.string().nullish(),
+  endDate: z.string().nullish(),
+});
+
+// ==================== CAMPAIGN VALIDATION SCHEMAS ====================
+
+export const createCampaignSchema = z.object({
+  name: z.string().min(1, "Campaign name is required").max(200),
+  description: z.string().max(1000).optional().or(z.literal("")),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]).default("MEDIUM"),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+});
+
+export const updateCampaignSchema = createCampaignSchema.partial();
+
+export const updateCampaignStatusSchema = z.object({
+  status: z.enum(["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"]),
+});
+
+export const addCampaignContactsSchema = z.object({
+  contactIds: z.array(z.string()).min(1, "At least one contact is required"),
+});
+
+export const recordOutcomeSchema = z.object({
+  outcome: z.enum([
+    "ANSWERED",
+    "NO_ANSWER",
+    "VOICEMAIL",
+    "BUSY",
+    "CALLBACK_REQUESTED",
+    "NOT_INTERESTED",
+    "WRONG_NUMBER",
+    "DO_NOT_CALL",
+  ]),
+  notes: z.string().max(2000).optional().or(z.literal("")),
+  callbackAt: z.string().optional(),
+});
+
+// Alias for queue-specific outcome recording
+export const recordQueueOutcomeSchema = recordOutcomeSchema;
+
+export const campaignFiltersSchema = paginationSchema.extend({
+  status: z.enum(["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"]).nullish(),
+  createdById: z.string().nullish(),
+  search: z.string().nullish(),
+});
+
+// ==================== IMPORT VALIDATION SCHEMAS ====================
+
+export const importRowSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  email: z.string().email().optional().or(z.literal("")),
+  phone: z.string().max(20).optional().or(z.literal("")),
+  title: z.string().max(100).optional().or(z.literal("")),
+  companyName: z.string().max(200).optional().or(z.literal("")),
+  status: z.enum(["LEAD", "QUALIFIED", "CUSTOMER", "CHURNED", "PARTNER"]).optional(),
+  source: z.string().max(100).optional().or(z.literal("")),
+  tags: z.string().optional().or(z.literal("")), // Comma-separated
+});
+
+export const executeImportSchema = z.object({
+  importId: z.string().min(1),
+  columnMapping: z.record(z.string()),
+  skipDuplicates: z.boolean().default(true),
+  updateDuplicates: z.boolean().default(false),
 });
 
 // Type exports
@@ -128,3 +275,25 @@ export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type CreateActivityInput = z.infer<typeof createActivitySchema>;
 export type CreateNoteInput = z.infer<typeof createNoteSchema>;
+
+// Quote types
+export type CreateQuoteItemInput = z.infer<typeof createQuoteItemSchema>;
+export type CreateQuoteInput = z.infer<typeof createQuoteSchema>;
+export type UpdateQuoteInput = z.infer<typeof updateQuoteSchema>;
+export type UpdateQuoteStatusInput = z.infer<typeof updateQuoteStatusSchema>;
+
+// Call scheduling types
+export type CreateScheduledCallInput = z.infer<typeof createScheduledCallSchema>;
+export type UpdateScheduledCallInput = z.infer<typeof updateScheduledCallSchema>;
+export type CompleteCallInput = z.infer<typeof completeCallSchema>;
+
+// Campaign types
+export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;
+export type UpdateCampaignInput = z.infer<typeof updateCampaignSchema>;
+export type UpdateCampaignStatusInput = z.infer<typeof updateCampaignStatusSchema>;
+export type AddCampaignContactsInput = z.infer<typeof addCampaignContactsSchema>;
+export type RecordOutcomeInput = z.infer<typeof recordOutcomeSchema>;
+
+// Import types
+export type ImportRowInput = z.infer<typeof importRowSchema>;
+export type ExecuteImportInput = z.infer<typeof executeImportSchema>;

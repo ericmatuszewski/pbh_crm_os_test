@@ -71,6 +71,8 @@ export async function PUT(
     if (data.contactId !== undefined) updateData.contactId = data.contactId || null;
     if (data.companyId !== undefined) updateData.companyId = data.companyId || null;
     if (data.ownerId) updateData.ownerId = data.ownerId;
+    if (data.pipelineId !== undefined) updateData.pipelineId = data.pipelineId || null;
+    if (data.stageId !== undefined) updateData.stageId = data.stageId || null;
 
     const deal = await prisma.deal.update({
       where: { id: params.id },

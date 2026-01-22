@@ -1,3 +1,4 @@
+/// <reference types="jest" />
 import '@testing-library/jest-dom';
 
 // Mock Next.js router

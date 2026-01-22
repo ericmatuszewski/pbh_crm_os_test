@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createDealSchema, dealFiltersSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
+import { getCurrentBusiness, buildBusinessScopeFilter } from "@/lib/business";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +17,17 @@ export async function GET(request: NextRequest) {
       maxValue: searchParams.get("maxValue"),
     });
 
+    // Get current business for scoping
+    const business = await getCurrentBusiness(request);
+
     const where: Prisma.DealWhereInput = {};
+
+    // Add business scoping
+    if (business) {
+      const isParent = !business.parentId;
+      const businessScope = await buildBusinessScopeFilter(business.id, isParent);
+      Object.assign(where, businessScope);
+    }
 
     if (filters.search) {
       where.title = { contains: filters.search, mode: "insensitive" };
@@ -47,6 +58,8 @@ export async function GET(request: NextRequest) {
           contact: { select: { id: true, firstName: true, lastName: true } },
           company: { select: { id: true, name: true } },
           owner: { select: { id: true, name: true, email: true, image: true } },
+          pipelineStage: { select: { id: true, name: true, color: true, probability: true } },
+          pipeline: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: "desc" },
         skip: (filters.page - 1) * filters.limit,
@@ -85,6 +98,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = createDealSchema.parse(body);
 
+    // Get current business
+    const business = await getCurrentBusiness(request);
+    if (!business) {
+      return NextResponse.json(
+        { success: false, error: { code: "NO_BUSINESS", message: "No business selected" } },
+        { status: 400 }
+      );
+    }
+
     const deal = await prisma.deal.create({
       data: {
         title: data.title,
@@ -96,11 +118,16 @@ export async function POST(request: NextRequest) {
         contactId: data.contactId || null,
         companyId: data.companyId || null,
         ownerId: data.ownerId,
+        pipelineId: data.pipelineId || null,
+        stageId: data.stageId || null,
+        businessId: business.id,
       },
       include: {
         contact: { select: { id: true, firstName: true, lastName: true } },
         company: { select: { id: true, name: true } },
         owner: { select: { id: true, name: true, email: true } },
+        pipelineStage: { select: { id: true, name: true, color: true, probability: true } },
+        pipeline: { select: { id: true, name: true } },
       },
     });
 

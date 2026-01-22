@@ -28,8 +28,14 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  output: "standalone",
   experimental: {
-    serverComponentsExternalPackages: ["@prisma/client"],
+    serverComponentsExternalPackages: [
+      "@prisma/client",
+      "@react-pdf/renderer",
+      "@react-pdf/pdfkit",
+      "@react-pdf/layout",
+    ],
   },
   images: {
     remotePatterns: [

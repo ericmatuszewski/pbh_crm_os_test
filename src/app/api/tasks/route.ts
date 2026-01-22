@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createTaskSchema, taskFiltersSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
+import { getCurrentBusiness, buildBusinessScopeFilter } from "@/lib/business";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +15,17 @@ export async function GET(request: NextRequest) {
       assigneeId: searchParams.get("assigneeId"),
     });
 
+    // Get current business for scoping
+    const business = await getCurrentBusiness(request);
+
     const where: Prisma.TaskWhereInput = {};
+
+    // Add business scoping
+    if (business) {
+      const isParent = !business.parentId;
+      const businessScope = await buildBusinessScopeFilter(business.id, isParent);
+      Object.assign(where, businessScope);
+    }
 
     if (filters.status) {
       where.status = filters.status;
@@ -65,6 +76,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = createTaskSchema.parse(body);
 
+    // Get current business
+    const business = await getCurrentBusiness(request);
+    if (!business) {
+      return NextResponse.json(
+        { success: false, error: { code: "NO_BUSINESS", message: "No business selected" } },
+        { status: 400 }
+      );
+    }
+
     const task = await prisma.task.create({
       data: {
         title: data.title,
@@ -75,6 +95,7 @@ export async function POST(request: NextRequest) {
         assigneeId: data.assigneeId,
         relatedType: data.relatedType || null,
         relatedId: data.relatedId || null,
+        businessId: business.id,
       },
       include: {
         assignee: { select: { id: true, name: true, email: true } },

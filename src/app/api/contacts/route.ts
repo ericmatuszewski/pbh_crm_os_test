@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createContactSchema, contactFiltersSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
+import { getCurrentBusiness, buildBusinessScopeFilter } from "@/lib/business";
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +15,17 @@ export async function GET(request: NextRequest) {
       companyId: searchParams.get("companyId"),
     });
 
+    // Get current business for scoping
+    const business = await getCurrentBusiness(request);
+
     const where: Prisma.ContactWhereInput = {};
+
+    // Add business scoping
+    if (business) {
+      const isParent = !business.parentId;
+      const businessScope = await buildBusinessScopeFilter(business.id, isParent);
+      Object.assign(where, businessScope);
+    }
 
     if (filters.search) {
       where.OR = [
@@ -70,6 +81,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const data = createContactSchema.parse(body);
 
+    // Get current business
+    const business = await getCurrentBusiness(request);
+    if (!business) {
+      return NextResponse.json(
+        { success: false, error: { code: "NO_BUSINESS", message: "No business selected" } },
+        { status: 400 }
+      );
+    }
+
     const contact = await prisma.contact.create({
       data: {
         firstName: data.firstName,
@@ -81,6 +101,7 @@ export async function POST(request: NextRequest) {
         status: data.status,
         source: data.source || null,
         ownerId: data.ownerId || null,
+        businessId: business.id,
       },
       include: {
         company: { select: { id: true, name: true } },

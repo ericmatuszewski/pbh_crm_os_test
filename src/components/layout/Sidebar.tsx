@@ -12,6 +12,16 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  FileText,
+  Phone,
+  Package,
+  Mail,
+  Calendar,
+  Zap,
+  Star,
+  Bell,
+  Search,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,10 +29,20 @@ import { useState } from "react";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
+  { name: "Search", href: "/search", icon: Search },
   { name: "Contacts", href: "/contacts", icon: Users },
   { name: "Companies", href: "/companies", icon: Building2 },
   { name: "Deals", href: "/deals", icon: Target },
+  { name: "Quotes", href: "/quotes", icon: FileText },
+  { name: "Products", href: "/products", icon: Package },
+  { name: "Calls", href: "/calls", icon: Phone },
+  { name: "Calendar", href: "/calendar", icon: Calendar },
+  { name: "Communications", href: "/communications", icon: Mail },
   { name: "Tasks", href: "/tasks", icon: CheckSquare },
+  { name: "Automation", href: "/automation", icon: Zap },
+  { name: "Lead Scoring", href: "/lead-scoring", icon: Star },
+  { name: "Notifications", href: "/notifications", icon: Bell },
+  { name: "Documents", href: "/documents", icon: FolderOpen },
   { name: "Reports", href: "/reports", icon: BarChart3 },
 ];
 
@@ -56,7 +76,9 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
         {navigation.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = item.href === "/"
+            ? pathname === item.href
+            : pathname === item.href || pathname?.startsWith(item.href + "/");
           return (
             <Link
               key={item.name}
@@ -78,7 +100,7 @@ export function Sidebar() {
       {/* Bottom navigation */}
       <div className="px-2 py-4 border-t border-slate-700">
         {bottomNavigation.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
           return (
             <Link
               key={item.name}
