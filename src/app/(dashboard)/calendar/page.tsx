@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -97,13 +97,7 @@ export default function CalendarPage() {
     dealId: "",
   });
 
-  useEffect(() => {
-    fetchMeetings();
-    fetchContacts();
-    fetchDeals();
-  }, [currentDate]);
-
-  const fetchMeetings = async () => {
+  const fetchMeetings = useCallback(async () => {
     try {
       setLoading(true);
       const start = startOfMonth(currentDate);
@@ -121,7 +115,13 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentDate]);
+
+  useEffect(() => {
+    fetchMeetings();
+    fetchContacts();
+    fetchDeals();
+  }, [fetchMeetings]);
 
   const fetchContacts = async () => {
     try {

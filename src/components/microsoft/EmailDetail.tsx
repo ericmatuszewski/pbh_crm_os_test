@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -57,15 +57,7 @@ export function EmailDetail({
   const [fullEmail, setFullEmail] = useState<Email | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (email.bodyHtml === null) {
-      fetchFullEmail();
-    } else {
-      setFullEmail(email);
-    }
-  }, [email.id]);
-
-  const fetchFullEmail = async () => {
+  const fetchFullEmail = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/microsoft/emails/${email.id}`);
@@ -78,7 +70,15 @@ export function EmailDetail({
     } finally {
       setLoading(false);
     }
-  };
+  }, [email.id]);
+
+  useEffect(() => {
+    if (email.bodyHtml === null) {
+      fetchFullEmail();
+    } else {
+      setFullEmail(email);
+    }
+  }, [email, fetchFullEmail]);
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "";

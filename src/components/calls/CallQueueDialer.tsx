@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
 import {
   Phone,
@@ -63,11 +63,7 @@ export function CallQueueDialer({
   const [showOutcomeDialog, setShowOutcomeDialog] = useState(false);
   const [callStartTime, setCallStartTime] = useState<Date | null>(null);
 
-  useEffect(() => {
-    fetchNextContact();
-  }, [campaign.id]);
-
-  const fetchNextContact = async () => {
+  const fetchNextContact = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch(`/api/calls/campaigns/${campaign.id}/next`);
@@ -80,7 +76,11 @@ export function CallQueueDialer({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [campaign.id]);
+
+  useEffect(() => {
+    fetchNextContact();
+  }, [fetchNextContact]);
 
   const handleCallStart = () => {
     setCallStartTime(new Date());

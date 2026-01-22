@@ -41,6 +41,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface MediaItem {
   id: string;
@@ -318,10 +319,13 @@ export function ProductMediaGallery({
         {/* Thumbnail/Preview */}
         <div className="aspect-square bg-slate-100 flex items-center justify-center">
           {item.mediaType === "IMAGE" ? (
-            <img
+            <Image
               src={item.thumbnailUrl || item.url}
               alt={item.filename}
+              width={300}
+              height={300}
               className="w-full h-full object-cover"
+              unoptimized
             />
           ) : (
             <Icon className="h-12 w-12 text-slate-400" />

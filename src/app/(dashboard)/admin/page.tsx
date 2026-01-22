@@ -46,8 +46,7 @@ import {
   Cloud,
   Bell,
   Lock,
-  Users,
-  Building2,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -282,6 +281,18 @@ export default function AdminControlPanel() {
           )}
           Save Changes
         </Button>
+      </div>
+
+      {/* Admin-only warning banner */}
+      <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+        <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="font-medium text-amber-800">Administrator Access Required</p>
+          <p className="text-sm text-amber-700">
+            This control panel contains system-wide settings. Changes here affect all users and businesses.
+            Only system administrators should have access to this page.
+          </p>
+        </div>
       </div>
 
       <Tabs defaultValue="mail">

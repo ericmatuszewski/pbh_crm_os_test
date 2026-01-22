@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -95,11 +95,7 @@ export default function CampaignDetailPage() {
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
   const [isAddingContacts, setIsAddingContacts] = useState(false);
 
-  useEffect(() => {
-    fetchCampaign();
-  }, [campaignId]);
-
-  const fetchCampaign = async () => {
+  const fetchCampaign = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch(`/api/calls/campaigns/${campaignId}`);
@@ -112,7 +108,11 @@ export default function CampaignDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [campaignId]);
+
+  useEffect(() => {
+    fetchCampaign();
+  }, [fetchCampaign]);
 
   const fetchContacts = async () => {
     try {

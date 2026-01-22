@@ -65,6 +65,20 @@ function IntegrationsPageContent() {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [composerMode, setComposerMode] = useState<"new" | "reply" | "replyAll" | "forward">("new");
 
+  const fetchMailboxes = useCallback(async () => {
+    try {
+      const res = await fetch("/api/microsoft/mailboxes");
+      const data = await res.json();
+      if (data.success) {
+        setMailboxes(data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch mailboxes:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Check for OAuth callback params
   useEffect(() => {
     if (!searchParams) return;
@@ -82,21 +96,7 @@ function IntegrationsPageContent() {
     if (error) {
       console.error("Microsoft OAuth error:", error);
     }
-  }, [searchParams]);
-
-  const fetchMailboxes = useCallback(async () => {
-    try {
-      const res = await fetch("/api/microsoft/mailboxes");
-      const data = await res.json();
-      if (data.success) {
-        setMailboxes(data.data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch mailboxes:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  }, [searchParams, fetchMailboxes]);
 
   useEffect(() => {
     fetchMailboxes();

@@ -55,6 +55,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface Document {
   id: string;
@@ -535,10 +536,13 @@ export default function DocumentsPage() {
                     />
                   ) : selectedDocument.mimeType.startsWith("image/") && selectedDocument.url ? (
                     <div className="flex justify-center">
-                      <img
+                      <Image
                         src={selectedDocument.url}
                         alt={selectedDocument.name}
+                        width={800}
+                        height={500}
                         className="max-w-full max-h-[500px] object-contain"
+                        unoptimized
                       />
                     </div>
                   ) : selectedDocument.mimeType.startsWith("video/") && selectedDocument.url ? (

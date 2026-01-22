@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,11 +80,7 @@ export function ActivityTimeline({
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
 
-  useEffect(() => {
-    fetchTimeline(0);
-  }, [contactId, dealId, companyId]);
-
-  const fetchTimeline = async (newOffset: number) => {
+  const fetchTimeline = useCallback(async (newOffset: number) => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -111,7 +107,11 @@ export function ActivityTimeline({
     } finally {
       setLoading(false);
     }
-  };
+  }, [contactId, dealId, companyId]);
+
+  useEffect(() => {
+    fetchTimeline(0);
+  }, [fetchTimeline]);
 
   const loadMore = () => {
     fetchTimeline(offset + 20);

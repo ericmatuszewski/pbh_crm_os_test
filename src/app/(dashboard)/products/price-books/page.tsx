@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Pencil, Trash2, BookOpen, Percent, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,12 +73,7 @@ export default function PriceBooksPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchPriceBooks();
-    fetchProducts();
-  }, []);
-
-  const fetchPriceBooks = async () => {
+  const fetchPriceBooks = useCallback(async () => {
     try {
       const response = await fetch("/api/price-books");
       const result = await response.json();
@@ -94,7 +89,12 @@ export default function PriceBooksPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchPriceBooks();
+    fetchProducts();
+  }, [fetchPriceBooks]);
 
   const fetchProducts = async () => {
     try {

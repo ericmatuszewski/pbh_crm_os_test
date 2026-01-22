@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -127,11 +127,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState("all");
 
-  useEffect(() => {
-    fetchData();
-  }, [timeRange]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/analytics?range=${timeRange}`);
@@ -144,7 +140,11 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeRange]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("en-US", {

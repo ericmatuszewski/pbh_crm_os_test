@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format, isToday, isBefore } from "date-fns";
 import {
   Phone,
@@ -50,13 +50,7 @@ export function DailyCallList({
   const [calls, setCalls] = useState<ScheduledCall[]>(initialCalls || []);
   const [isLoading, setIsLoading] = useState(!initialCalls);
 
-  useEffect(() => {
-    if (!initialCalls) {
-      fetchTodaysCalls();
-    }
-  }, [initialCalls, date]);
-
-  const fetchTodaysCalls = async () => {
+  const fetchTodaysCalls = useCallback(async () => {
     setIsLoading(true);
     try {
       const dateStr = format(date, "yyyy-MM-dd");
@@ -70,7 +64,13 @@ export function DailyCallList({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [date]);
+
+  useEffect(() => {
+    if (!initialCalls) {
+      fetchTodaysCalls();
+    }
+  }, [initialCalls, fetchTodaysCalls]);
 
   const getStatusColor = (status: string, scheduledAt: string) => {
     if (status === "COMPLETED") return "bg-green-100 text-green-800";

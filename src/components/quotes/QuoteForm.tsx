@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { QuoteItemsTable, QuoteItemInput } from "./QuoteItemsTable";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { addDays, format } from "date-fns";
 import { Product, QuoteTemplate } from "@/types";
 import { FileText } from "lucide-react";
@@ -108,6 +108,26 @@ export function QuoteForm({
     fetchProducts();
   }, []);
 
+  const applyTemplate = useCallback((template: QuoteTemplate) => {
+    setValue("templateId", template.id);
+    if (template.termsConditions) {
+      setValue("termsConditions", template.termsConditions);
+    }
+    if (template.paymentTerms) {
+      setValue("paymentTerms", template.paymentTerms);
+    }
+    if (template.notes) {
+      setValue("notes", template.notes);
+    }
+    if (template.defaultDiscountPercent) {
+      setValue("discountType", "percentage");
+      setValue("discountValue", template.defaultDiscountPercent);
+    }
+    if (template.defaultTaxRate) {
+      setValue("taxRate", template.defaultTaxRate);
+    }
+  }, [setValue]);
+
   // Fetch templates
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -131,27 +151,7 @@ export function QuoteForm({
       }
     };
     fetchTemplates();
-  }, [isEdit, initialData?.templateId]);
-
-  const applyTemplate = (template: QuoteTemplate) => {
-    setValue("templateId", template.id);
-    if (template.termsConditions) {
-      setValue("termsConditions", template.termsConditions);
-    }
-    if (template.paymentTerms) {
-      setValue("paymentTerms", template.paymentTerms);
-    }
-    if (template.notes) {
-      setValue("notes", template.notes);
-    }
-    if (template.defaultDiscountPercent) {
-      setValue("discountType", "percentage");
-      setValue("discountValue", template.defaultDiscountPercent);
-    }
-    if (template.defaultTaxRate) {
-      setValue("taxRate", template.defaultTaxRate);
-    }
-  };
+  }, [isEdit, initialData?.templateId, applyTemplate]);
 
   const handleTemplateChange = (templateId: string) => {
     if (templateId === "_none") {

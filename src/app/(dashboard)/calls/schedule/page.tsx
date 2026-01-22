@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   format,
@@ -66,11 +66,7 @@ export default function ScheduleCalendarPage() {
   const weekEnd = endOfWeek(currentWeek, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  useEffect(() => {
-    fetchCalls();
-  }, [currentWeek]);
-
-  const fetchCalls = async () => {
+  const fetchCalls = useCallback(async () => {
     setIsLoading(true);
     try {
       const startDate = format(weekStart, "yyyy-MM-dd");
@@ -87,7 +83,11 @@ export default function ScheduleCalendarPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [weekStart, weekEnd]);
+
+  useEffect(() => {
+    fetchCalls();
+  }, [fetchCalls]);
 
   const getCallsForDay = (date: Date) => {
     return calls.filter((call) =>

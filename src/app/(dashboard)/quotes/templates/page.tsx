@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Plus, Search, Pencil, Trash2, FileText, Eye, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { QuoteTemplate } from "@/types";
+import Image from "next/image";
 
 export default function QuoteTemplatesPage() {
   const { toast } = useToast();
@@ -53,11 +54,7 @@ export default function QuoteTemplatesPage() {
   });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTemplates();
-  }, []);
-
-  const fetchTemplates = async () => {
+  const fetchTemplates = useCallback(async () => {
     try {
       const response = await fetch("/api/quote-templates");
       const result = await response.json();
@@ -73,7 +70,11 @@ export default function QuoteTemplatesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [fetchTemplates]);
 
   const handleOpenDialog = (template?: QuoteTemplate) => {
     if (template) {
@@ -508,10 +509,13 @@ export default function QuoteTemplatesPage() {
                   />
                   {formData.logoUrl && (
                     <div className="mt-2 p-4 border rounded-lg bg-muted/50">
-                      <img
+                      <Image
                         src={formData.logoUrl}
                         alt="Logo preview"
+                        width={200}
+                        height={64}
                         className="max-h-16 object-contain"
+                        unoptimized
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = "none";
                         }}
@@ -567,10 +571,13 @@ export default function QuoteTemplatesPage() {
               {/* Header Preview */}
               {previewTemplate.logoUrl && (
                 <div className="flex items-center gap-4 pb-4 border-b">
-                  <img
+                  <Image
                     src={previewTemplate.logoUrl}
                     alt="Company logo"
+                    width={150}
+                    height={48}
                     className="max-h-12 object-contain"
+                    unoptimized
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}

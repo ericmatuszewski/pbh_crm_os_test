@@ -13,6 +13,7 @@ import { Building2, ChevronDown, Check, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBusiness, Business } from "@/contexts/BusinessContext";
 import Link from "next/link";
+import Image from "next/image";
 
 export function BusinessSwitcher() {
   const { currentBusiness, businesses, isLoading, switchBusiness } =
@@ -54,10 +55,13 @@ export function BusinessSwitcher() {
           className="flex items-center gap-2 px-3 py-2 h-auto"
         >
           {currentBusiness.logoUrl ? (
-            <img
+            <Image
               src={currentBusiness.logoUrl}
               alt={currentBusiness.name}
+              width={24}
+              height={24}
               className="h-6 w-6 rounded object-contain"
+              unoptimized
             />
           ) : (
             <div
@@ -103,10 +107,13 @@ export function BusinessSwitcher() {
                   )}
                 >
                   {business.logoUrl ? (
-                    <img
+                    <Image
                       src={business.logoUrl}
                       alt={business.name}
+                      width={32}
+                      height={32}
                       className="h-8 w-8 rounded object-contain"
+                      unoptimized
                     />
                   ) : (
                     <div

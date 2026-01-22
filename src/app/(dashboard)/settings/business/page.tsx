@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { useBusiness } from "@/contexts/BusinessContext";
 import { toast } from "sonner";
+import Image from "next/image";
 
 interface BusinessSettings {
   id: string;
@@ -489,10 +490,13 @@ export default function BusinessSettingsPage() {
               {settings.logoUrl && (
                 <div className="p-4 border rounded-lg bg-muted/50">
                   <Label className="mb-2 block">Logo Preview</Label>
-                  <img
+                  <Image
                     src={settings.logoUrl}
                     alt="Company logo"
+                    width={160}
+                    height={80}
                     className="max-h-20 max-w-40 object-contain"
+                    unoptimized
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
                     }}
