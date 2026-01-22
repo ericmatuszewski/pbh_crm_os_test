@@ -96,6 +96,13 @@ enum CampaignStatus {
   ARCHIVED
 }
 
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+  PENDING_INVITE
+}
+
 // ==================== MODELS ====================
 
 // Pipeline for deal management
@@ -180,7 +187,33 @@ model User {
   image         String?
   role          UserRole   @default(REP)
   teamId        String?
-  team          Team?      @relation(fields: [teamId], references: [id])
+  team          Team?      @relation("TeamMembers", fields: [teamId], references: [id])
+
+  // User status and management
+  status            UserStatus @default(ACTIVE)
+
+  // Invitation system
+  inviteToken       String?    @unique
+  inviteTokenExpiry DateTime?
+  invitedById       String?
+
+  // Login security
+  failedLoginCount  Int        @default(0)
+  lockedAt          DateTime?
+  lockedReason      String?
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+
+  // MFA readiness
+  mfaEnabled        Boolean    @default(false)
+  mfaSecret         String?
+
+  // Profile
+  phoneNumber       String?
+  timezone          String?    @default("Europe/London")
+
+  // Soft delete
+  deletedAt         DateTime?
 
   // Multi-business support
   businesses    UserBusiness[]
@@ -198,16 +231,141 @@ model User {
   documentsUploaded Document[] @relation("DocumentsUploaded")
   documentTemplatesCreated DocumentTemplate[] @relation("DocumentTemplatesCreated")
   backgroundJobs BackgroundJob[]
+
+  // Team management relations
+  teamsOwned    Team[]     @relation("TeamOwner")
+  teamMemberships TeamMember[]
+  userSessions  UserSession[]
+
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+
+  @@index([status])
+  @@index([inviteToken])
+  @@index([email, status])
 }
 
 model Team {
+  id          String       @id @default(cuid())
+  name        String
+  description String?      @db.Text
+
+  // Ownership
+  ownerId     String?
+  owner       User?        @relation("TeamOwner", fields: [ownerId], references: [id])
+
+  // Business scope
+  businessId  String?
+  business    Business?    @relation(fields: [businessId], references: [id])
+
+  // Settings
+  isActive    Boolean      @default(true)
+
+  // Members (legacy relation for backwards compatibility)
+  members     User[]       @relation("TeamMembers")
+
+  // New membership model
+  teamMembers TeamMember[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([name, businessId])
+  @@index([businessId])
+  @@index([ownerId])
+  @@index([isActive])
+}
+
+model TeamMember {
   id        String   @id @default(cuid())
-  name      String
-  members   User[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Role within team
+  role      String   @default("member") // owner, admin, member
+
+  joinedAt  DateTime @default(now())
+  addedById String?
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model UserInvitation {
+  id            String    @id @default(cuid())
+
+  // Invitation details
+  email         String
+  name          String?
+
+  // Token management
+  token         String    @unique
+  expiresAt     DateTime
+
+  // Assignment
+  businessId    String?
+  business      Business? @relation(fields: [businessId], references: [id])
+  teamId        String?
+
+  // Roles to assign (RBAC role IDs)
+  roleIds       String[]  @default([])
+
+  // Status
+  status        String    @default("pending") // pending, accepted, expired, revoked
+
+  // Tracking
+  invitedById   String
+  invitedByName String?
+
+  acceptedAt    DateTime?
+  acceptedUserId String?
+
+  createdAt     DateTime  @default(now())
+
+  @@index([email])
+  @@index([token])
+  @@index([status])
+  @@index([businessId])
+}
+
+model UserSession {
+  id           String    @id @default(cuid())
+  sessionToken String    @unique
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Device info
+  deviceName   String?
+  deviceType   String?   // desktop, mobile, tablet
+  browser      String?
+  browserVersion String?
+  os           String?
+  osVersion    String?
+
+  // Location (from IP)
+  ipAddress    String?
+  country      String?
+  city         String?
+
+  // Activity tracking
+  lastActiveAt DateTime  @default(now())
+
+  // Status
+  isActive     Boolean   @default(true)
+  revokedAt    DateTime?
+  revokedById  String?
+  revokedReason String?
+
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@index([userId, isActive])
+  @@index([lastActiveAt])
 }
 
 // ==================== MULTI-BUSINESS SUPPORT ====================
@@ -296,6 +454,10 @@ model Business {
   microsoftCredentials  MicrosoftCredential[]
   microsoftMailboxes    MicrosoftMailbox[]
   emails                Email[]
+
+  // User Management Relations
+  teams                 Team[]
+  userInvitations       UserInvitation[]
 
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
@@ -3711,4 +3873,65 @@ model SystemSettings {
 
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
+}
+
+// ==================== DATA MANAGEMENT ====================
+
+model DatabaseBackup {
+  id              String    @id @default(cuid())
+
+  // Backup details
+  filename        String
+  fileSize        Int?      // bytes
+  fileUrl         String?   // Storage location
+
+  // Type
+  backupType      String    @default("full") // full, incremental
+
+  // Status
+  status          String    @default("pending") // pending, running, completed, failed
+  progress        Int       @default(0)
+  errorMessage    String?
+
+  // Metadata
+  triggeredById   String
+  triggeredByName String?
+
+  startedAt       DateTime?
+  completedAt     DateTime?
+
+  // Retention
+  expiresAt       DateTime?
+
+  createdAt       DateTime  @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([triggeredById])
+}
+
+model CleanupConfiguration {
+  id              String    @id @default(cuid())
+
+  name            String
+  description     String?
+
+  // Target entity
+  entity          String    // audit_logs, notifications, activities, deleted_records, jobs, login_history
+
+  // Retention
+  retentionDays   Int       @default(90)
+
+  // Status
+  isActive        Boolean   @default(true)
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  lastRunRecords  Int?      // Records cleaned in last run
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([entity])
+  @@index([isActive])
+  @@index([nextRunAt])
 }

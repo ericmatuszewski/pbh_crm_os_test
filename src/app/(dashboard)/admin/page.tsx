@@ -47,7 +47,9 @@ import {
   Bell,
   Lock,
   AlertTriangle,
+  HardDrive,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 
 interface SystemSettings {
@@ -273,14 +275,22 @@ export default function AdminControlPanel() {
             </div>
           </div>
         </div>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4 mr-2" />
-          )}
-          Save Changes
-        </Button>
+        <div className="flex gap-2">
+          <Link href="/admin/data">
+            <Button variant="outline">
+              <HardDrive className="h-4 w-4 mr-2" />
+              Data Management
+            </Button>
+          </Link>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-2" />
+            )}
+            Save Changes
+          </Button>
+        </div>
       </div>
 
       {/* Admin-only warning banner */}

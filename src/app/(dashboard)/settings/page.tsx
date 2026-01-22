@@ -62,10 +62,17 @@ const settingsSections = [
     badge: null,
   },
   {
-    title: "Users & Teams",
-    description: "Manage user accounts, roles, and team assignments",
+    title: "Users",
+    description: "Manage user accounts, invitations, status, and role assignments",
     href: "/settings/users",
     icon: Users,
+    badge: null,
+  },
+  {
+    title: "Teams",
+    description: "Organize users into teams for collaboration and permissions",
+    href: "/settings/teams",
+    icon: UserCog,
     badge: null,
   },
   {
@@ -84,8 +91,8 @@ const settingsSections = [
   },
   {
     title: "Data Management",
-    description: "Import/export data, manage backups, and data retention",
-    href: "/settings/data",
+    description: "Database backups, cleanup configuration, and statistics",
+    href: "/admin/data",
     icon: Database,
     badge: null,
   },
