@@ -133,6 +133,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Handle category - check if it's a valid category ID or just text
+    let categoryId: string | null = null;
+    if (data.category) {
+      // Check if it looks like a CUID (valid category ID)
+      const isCuid = /^c[a-z0-9]{24,}$/i.test(data.category);
+      if (isCuid) {
+        // Verify the category exists
+        const category = await prisma.productCategory.findUnique({
+          where: { id: data.category },
+        });
+        if (category) {
+          categoryId = data.category;
+        }
+      }
+      // If it's just text (like "software"), we don't set categoryId
+      // The text can be stored in tags or description instead
+    }
+
     const product = await prisma.product.create({
       data: {
         sku: data.sku,
@@ -143,7 +161,7 @@ export async function POST(request: NextRequest) {
         basePrice: data.basePrice,
         currency: data.currency,
         pricingType: data.pricingType,
-        categoryId: data.category || null,
+        categoryId,
         tags: data.tags,
         trackInventory: data.trackInventory,
         stockQuantity: data.stockQuantity,
