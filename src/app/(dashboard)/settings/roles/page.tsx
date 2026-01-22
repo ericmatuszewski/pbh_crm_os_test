@@ -103,6 +103,27 @@ const ENTITIES = [
 const ACTIONS = ["VIEW", "CREATE", "EDIT", "DELETE", "EXPORT", "IMPORT", "SHARE", "ASSIGN"];
 const RECORD_ACCESS_LEVELS = ["NONE", "OWN", "TEAM", "ALL"];
 
+// Pre-built permission levels for easier role creation
+const PERMISSION_LEVELS = [
+  { value: 100, label: "Administrator", description: "Full system access, can manage all settings and users" },
+  { value: 75, label: "Manager", description: "Can manage team members and view all data" },
+  { value: 50, label: "Team Lead", description: "Can oversee team work and edit team records" },
+  { value: 25, label: "Standard User", description: "Regular user with standard access" },
+  { value: 10, label: "Limited User", description: "Basic access to own records only" },
+  { value: 1, label: "Read Only", description: "Can only view data, no editing" },
+];
+
+// Helper to get level label from value
+const getLevelLabel = (level: number): string => {
+  const found = PERMISSION_LEVELS.find(l => l.value === level);
+  if (found) return found.label;
+  // Find closest level for custom values
+  const closest = PERMISSION_LEVELS.reduce((prev, curr) =>
+    Math.abs(curr.value - level) < Math.abs(prev.value - level) ? curr : prev
+  );
+  return `Custom (${closest.label} range)`;
+};
+
 export default function RolesSettingsPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
@@ -117,7 +138,7 @@ export default function RolesSettingsPage() {
     name: "",
     displayName: "",
     description: "",
-    level: 10,
+    level: 25, // Default to Standard User
     parentId: "",
   });
 
@@ -286,7 +307,7 @@ export default function RolesSettingsPage() {
       name: "",
       displayName: "",
       description: "",
-      level: 10,
+      level: 25, // Default to Standard User
       parentId: "",
     });
   };
@@ -386,7 +407,10 @@ export default function RolesSettingsPage() {
                     <TableCell className="max-w-xs truncate">
                       {role.description || "-"}
                     </TableCell>
-                    <TableCell>{role.level}</TableCell>
+                    <TableCell>
+                      <span className="font-medium">{getLevelLabel(role.level)}</span>
+                      <span className="text-xs text-muted-foreground ml-1">({role.level})</span>
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">
                         <Users className="mr-1 h-3 w-3" />
@@ -467,7 +491,10 @@ export default function RolesSettingsPage() {
                           "-"
                         )}
                       </TableCell>
-                      <TableCell>{role.level}</TableCell>
+                      <TableCell>
+                        <span className="font-medium">{getLevelLabel(role.level)}</span>
+                        <span className="text-xs text-muted-foreground ml-1">({role.level})</span>
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           <Users className="mr-1 h-3 w-3" />
@@ -555,39 +582,51 @@ export default function RolesSettingsPage() {
                 placeholder="Describe what this role is for..."
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="level">Permission Level</Label>
-                <Input
-                  id="level"
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={formData.level}
-                  onChange={(e) =>
-                    setFormData({ ...formData, level: parseInt(e.target.value) || 10 })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="parentId">Inherit From</Label>
-                <Select
-                  value={formData.parentId || "__none__"}
-                  onValueChange={(value) => setFormData({ ...formData, parentId: value === "__none__" ? "" : value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="No parent" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">No parent</SelectItem>
-                    {roles.map((role) => (
-                      <SelectItem key={role.id} value={role.id}>
-                        {role.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="level">Permission Level</Label>
+              <Select
+                value={formData.level.toString()}
+                onValueChange={(value) => setFormData({ ...formData, level: parseInt(value) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select permission level" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PERMISSION_LEVELS.map((level) => (
+                    <SelectItem key={level.value} value={level.value.toString()}>
+                      <div className="flex flex-col">
+                        <span>{level.label}</span>
+                        <span className="text-xs text-muted-foreground">{level.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Higher levels can manage lower level roles
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="parentId">Inherit From (Optional)</Label>
+              <Select
+                value={formData.parentId || "__none__"}
+                onValueChange={(value) => setFormData({ ...formData, parentId: value === "__none__" ? "" : value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="No parent" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No parent</SelectItem>
+                  {roles.map((role) => (
+                    <SelectItem key={role.id} value={role.id}>
+                      {role.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Inherit permissions from an existing role
+              </p>
             </div>
           </div>
           <DialogFooter>
@@ -629,19 +668,27 @@ export default function RolesSettingsPage() {
               />
             </div>
             {selectedRole?.type !== "SYSTEM" && (
-              <div className="grid grid-cols-2 gap-4">
+              <>
                 <div className="space-y-2">
                   <Label htmlFor="edit-level">Permission Level</Label>
-                  <Input
-                    id="edit-level"
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={formData.level}
-                    onChange={(e) =>
-                      setFormData({ ...formData, level: parseInt(e.target.value) || 10 })
-                    }
-                  />
+                  <Select
+                    value={formData.level.toString()}
+                    onValueChange={(value) => setFormData({ ...formData, level: parseInt(value) })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select permission level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PERMISSION_LEVELS.map((level) => (
+                        <SelectItem key={level.value} value={level.value.toString()}>
+                          <div className="flex flex-col">
+                            <span>{level.label}</span>
+                            <span className="text-xs text-muted-foreground">{level.description}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="edit-parentId">Inherit From</Label>
@@ -664,7 +711,7 @@ export default function RolesSettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
+              </>
             )}
           </div>
           <DialogFooter>
