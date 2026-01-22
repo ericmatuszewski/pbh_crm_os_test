@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { createDealSchema, dealFiltersSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
 import { getCurrentBusiness, buildBusinessScopeFilter } from "@/lib/business";
+import { triggerDealCreated } from "@/lib/scoring/trigger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -130,6 +131,11 @@ export async function POST(request: NextRequest) {
         pipeline: { select: { id: true, name: true } },
       },
     });
+
+    // Trigger lead scoring for DEAL_CREATED event
+    if (deal.contactId) {
+      await triggerDealCreated(deal.contactId, deal.id, deal.title);
+    }
 
     return NextResponse.json(
       { success: true, data: { ...deal, value: Number(deal.value) } },

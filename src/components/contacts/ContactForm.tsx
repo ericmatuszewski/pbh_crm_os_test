@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const contactSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -91,10 +92,14 @@ export function ContactForm({
         status: data.status,
         source: data.source || undefined,
       });
+      toast.success(isEdit ? "Contact updated" : "Contact created");
       reset();
       onClose();
     } catch (error) {
       console.error("Failed to save contact:", error);
+      toast.error("Failed to save contact", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setIsSubmitting(false);
     }

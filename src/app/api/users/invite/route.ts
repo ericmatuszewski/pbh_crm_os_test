@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createInvitation } from "@/lib/users/invitation";
+import { getCurrentUser } from "@/lib/auth/get-current-user";
 
 // POST /api/users/invite - Send user invitation
 export async function POST(request: NextRequest) {
@@ -23,9 +24,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TODO: Get actual user ID and name from session
-    const invitedById = "system";
-    const invitedByName = "System";
+    // Get current user from session
+    const currentUser = await getCurrentUser(request);
+    const invitedById = currentUser.id;
+    const invitedByName = currentUser.name;
 
     const invitation = await createInvitation({
       email,

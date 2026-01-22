@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Notification {
   id: string;
@@ -90,6 +91,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       }
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
+      toast.error("Failed to load notifications");
     } finally {
       setIsLoading(false);
     }
@@ -112,6 +114,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       fetchNotifications();
     } catch (error) {
       console.error("Failed to mark as read:", error);
+      toast.error("Failed to update notification");
     }
   };
 
@@ -125,6 +128,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       fetchNotifications();
     } catch (error) {
       console.error("Failed to mark all as read:", error);
+      toast.error("Failed to mark all as read");
     }
   };
 
@@ -138,6 +142,7 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       fetchNotifications();
     } catch (error) {
       console.error("Failed to archive notification:", error);
+      toast.error("Failed to archive notification");
     }
   };
 

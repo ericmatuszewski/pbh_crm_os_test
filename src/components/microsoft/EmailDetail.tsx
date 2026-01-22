@@ -33,6 +33,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { Email } from "./types";
 
 interface EmailDetailProps {
@@ -67,6 +68,9 @@ export function EmailDetail({
       }
     } catch (error) {
       console.error("Failed to fetch email:", error);
+      toast.error("Failed to load email", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setLoading(false);
     }
@@ -105,6 +109,9 @@ export function EmailDetail({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to download attachment:", error);
+      toast.error("Failed to download attachment", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     }
   };
 

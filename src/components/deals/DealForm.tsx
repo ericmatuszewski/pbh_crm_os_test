@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const dealSchema = z.object({
   title: z.string().min(1, "Deal title is required"),
@@ -109,10 +110,14 @@ export function DealForm({
         companyId: data.companyId || undefined,
         ownerId: "current-user-id", // In real app, get from auth context
       });
+      toast.success(isEdit ? "Deal updated" : "Deal created");
       reset();
       onClose();
     } catch (error) {
       console.error("Failed to save deal:", error);
+      toast.error("Failed to save deal", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setIsSubmitting(false);
     }

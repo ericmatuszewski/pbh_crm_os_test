@@ -328,7 +328,7 @@ export async function recordSuccessfulLogin(userId: string, ipAddress: string) {
   });
 }
 
-export default {
+const userService = {
   getUserById,
   listUsers,
   updateUser,
@@ -338,3 +338,5 @@ export default {
   recordFailedLogin,
   recordSuccessfulLogin,
 };
+
+export default userService;

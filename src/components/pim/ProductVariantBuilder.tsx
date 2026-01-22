@@ -42,6 +42,7 @@ import {
   Check,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Attribute {
   id: string;
@@ -144,6 +145,9 @@ export function ProductVariantBuilder({
       }
     } catch (error) {
       console.error("Failed to fetch data:", error);
+      toast.error("Failed to load variant data", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setLoading(false);
     }
@@ -316,6 +320,9 @@ export function ProductVariantBuilder({
       }
     } catch (error) {
       console.error("Failed to delete variant:", error);
+      toast.error("Failed to delete variant", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     }
   };
 

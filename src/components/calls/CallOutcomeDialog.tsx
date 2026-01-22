@@ -38,6 +38,7 @@ import {
   HelpTooltip,
   QuickTip,
 } from "@/components/accessible";
+import { toast } from "sonner";
 import {
   CALL_OUTCOME_DEFINITIONS,
   OutcomeIcon,
@@ -208,7 +209,9 @@ export function CallOutcomeDialog({
       }
     } catch (error) {
       console.error("Error completing call:", error);
-      setApiError("An unexpected error occurred. Please try again.");
+      const errorMessage = "An unexpected error occurred. Please try again.";
+      setApiError(errorMessage);
+      toast.error("Error completing call", { description: errorMessage });
     } finally {
       setIsSubmitting(false);
     }

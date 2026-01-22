@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const createCampaignSchema = z.object({
   name: z.string().min(1, "Campaign name is required"),
@@ -102,12 +103,19 @@ export function CampaignForm({
       const result = await response.json();
 
       if (result.success) {
+        toast.success(campaign ? "Campaign updated" : "Campaign created");
         onSuccess?.(result.data);
       } else {
         console.error("Failed to save campaign:", result.error);
+        toast.error("Failed to save campaign", {
+          description: result.error?.message || "Please try again"
+        });
       }
     } catch (error) {
       console.error("Error saving campaign:", error);
+      toast.error("Error saving campaign", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setIsSubmitting(false);
     }

@@ -105,6 +105,8 @@ export interface Contact {
   source: string | null;
   ownerId: string | null;
   tags?: Tag[];
+  leadScore: number;
+  lastScoredAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

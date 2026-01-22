@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { LeadScoreBadge } from "@/components/contacts/LeadScoreBadge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -40,6 +41,7 @@ export function ContactTable({ contacts, onEdit, onDelete }: ContactTableProps) 
             <TableHead>Phone</TableHead>
             <TableHead>Company</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Score</TableHead>
             <TableHead>Created</TableHead>
             <TableHead className="w-[70px]"></TableHead>
           </TableRow>
@@ -107,6 +109,9 @@ export function ContactTable({ contacts, onEdit, onDelete }: ContactTableProps) 
                 </TableCell>
                 <TableCell>
                   <StatusBadge status={contact.status} />
+                </TableCell>
+                <TableCell>
+                  <LeadScoreBadge score={contact.leadScore ?? 0} size="sm" />
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {formatDate(contact.createdAt)}

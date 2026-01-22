@@ -18,6 +18,7 @@ import { useState, useEffect, useCallback } from "react";
 import { addDays, format } from "date-fns";
 import { Product, QuoteTemplate } from "@/types";
 import { FileText } from "lucide-react";
+import { toast } from "sonner";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -101,6 +102,7 @@ export function QuoteForm({
         }
       } catch (error) {
         console.error("Failed to fetch products:", error);
+        toast.error("Failed to load products");
       } finally {
         setLoadingProducts(false);
       }
@@ -146,6 +148,7 @@ export function QuoteForm({
         }
       } catch (error) {
         console.error("Failed to fetch templates:", error);
+        toast.error("Failed to load templates");
       } finally {
         setLoadingTemplates(false);
       }

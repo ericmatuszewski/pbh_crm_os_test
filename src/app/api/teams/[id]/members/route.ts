@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { logAudit } from "@/lib/audit/logger";
+import { getCurrentUserId } from "@/lib/auth/get-current-user";
 
 // GET /api/teams/[id]/members - List team members
 export async function GET(
@@ -88,8 +89,8 @@ export async function POST(
       );
     }
 
-    // TODO: Get actual user ID from session
-    const addedById = "system";
+    // Get current user from session
+    const addedById = await getCurrentUserId(request);
 
     const member = await prisma.teamMember.create({
       data: {
@@ -169,6 +170,7 @@ export async function DELETE(
     });
 
     // Log removal
+    const deletedById = await getCurrentUserId(request);
     await logAudit(
       {
         action: "DELETE",
@@ -176,7 +178,7 @@ export async function DELETE(
         entityId: member.id,
         previousValues: member as Record<string, unknown>,
       },
-      { userId: "system" }
+      { userId: deletedById }
     );
 
     return NextResponse.json({

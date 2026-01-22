@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronDown, ChevronRight, Save, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   CustomFieldDefinition,
   CustomFieldType,
@@ -72,6 +73,9 @@ export function CustomFieldsRenderer({
       }
     } catch (error) {
       console.error("Failed to fetch custom fields:", error);
+      toast.error("Failed to load custom fields", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setLoading(false);
     }
@@ -123,11 +127,15 @@ export function CustomFieldsRenderer({
         setHasChanges(false);
         fetchFieldsAndValues();
       } else {
-        alert(data.data?.errors?.[0]?.error || "Failed to save values");
+        toast.error("Failed to save custom fields", {
+          description: data.data?.errors?.[0]?.error || "Please try again"
+        });
       }
     } catch (error) {
       console.error("Failed to save custom field values:", error);
-      alert("Failed to save values");
+      toast.error("Failed to save custom fields", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setSaving(false);
     }

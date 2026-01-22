@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { recordQueueOutcomeSchema } from "@/lib/validations";
+import { triggerCallAnswered, triggerCallPositiveOutcome } from "@/lib/scoring/trigger";
 
 export async function PATCH(
   request: NextRequest,
@@ -78,6 +79,14 @@ export async function PATCH(
         contactId: existingItem.contactId,
       },
     });
+
+    // Trigger lead scoring for call outcomes
+    const contactName = `${existingItem.contact.firstName} ${existingItem.contact.lastName}`;
+    if (isSuccessful) {
+      // ANSWERED call - trigger positive scoring
+      await triggerCallAnswered(existingItem.contactId, params.id, contactName);
+      await triggerCallPositiveOutcome(existingItem.contactId, params.id, contactName);
+    }
 
     // Handle callback scheduling
     if (data.outcome === "CALLBACK_REQUESTED" && data.callbackAt) {

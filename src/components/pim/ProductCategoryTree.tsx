@@ -41,6 +41,7 @@ import {
   GripVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Category {
   id: string;
@@ -99,6 +100,9 @@ export function ProductCategoryTree({
       }
     } catch (error) {
       console.error("Failed to fetch categories:", error);
+      toast.error("Failed to load categories", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setLoading(false);
     }
@@ -187,6 +191,9 @@ export function ProductCategoryTree({
       }
     } catch (error) {
       console.error("Failed to save category:", error);
+      toast.error("Failed to save category", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     }
   };
 
@@ -211,6 +218,9 @@ export function ProductCategoryTree({
       }
     } catch (error) {
       console.error("Failed to delete category:", error);
+      toast.error("Failed to delete category", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     }
   };
 

@@ -17,6 +17,7 @@ import {
   Unlink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface MicrosoftCredential {
   id: string;
@@ -63,6 +64,9 @@ export function MicrosoftConnectionCard({
       }
     } catch (error) {
       console.error("Failed to fetch credential:", error);
+      toast.error("Failed to load Microsoft connection", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setLoading(false);
     }
@@ -131,6 +135,9 @@ export function MicrosoftConnectionCard({
       }
     } catch (error) {
       console.error("Failed to refresh token:", error);
+      toast.error("Failed to refresh token", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     }
   };
 

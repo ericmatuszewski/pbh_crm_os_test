@@ -25,7 +25,8 @@ export type JobType =
   | "email_sync"
   | "email_delta_sync"
   | "subscription_renewal"
-  | "call_timeout";
+  | "call_timeout"
+  | "score_decay";
 
 export interface JobPayload {
   [key: string]: unknown;
@@ -778,7 +779,26 @@ registerHandler("call_timeout", async (payload, updateProgress) => {
   }
 });
 
-export default {
+// Score decay handler - Apply score decay to inactive contacts
+registerHandler("score_decay", async (_payload, updateProgress) => {
+  await updateProgress(10, "Starting score decay processing");
+
+  try {
+    const { processScoreDecay } = await import("@/lib/scoring/engine");
+
+    await updateProgress(30, "Applying score decay rules");
+    const decayedCount = await processScoreDecay();
+
+    await updateProgress(100, `Applied decay to ${decayedCount} contacts`);
+
+    return { success: true, data: { decayedCount } };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, error: message };
+  }
+});
+
+const jobService = {
   createJob,
   createJobs,
   registerHandler,
@@ -789,3 +809,5 @@ export default {
   getJobLogs,
   cleanupOldJobs,
 };
+
+export default jobService;

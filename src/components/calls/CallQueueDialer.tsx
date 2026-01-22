@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { CallButton } from "./PhoneDialer";
 import { CallOutcomeDialog } from "./CallOutcomeDialog";
+import { toast } from "sonner";
 
 interface QueueItem {
   id: string;
@@ -73,6 +74,9 @@ export function CallQueueDialer({
       }
     } catch (error) {
       console.error("Error fetching next contact:", error);
+      toast.error("Error fetching next contact", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -111,6 +115,9 @@ export function CallQueueDialer({
       }
     } catch (error) {
       console.error("Error recording outcome:", error);
+      toast.error("Error recording outcome", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     }
   };
 
@@ -122,6 +129,9 @@ export function CallQueueDialer({
       fetchNextContact();
     } catch (error) {
       console.error("Error skipping contact:", error);
+      toast.error("Error skipping contact", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     }
   };
 

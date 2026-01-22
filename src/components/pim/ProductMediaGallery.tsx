@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { toast } from "sonner";
 
 interface MediaItem {
   id: string;
@@ -99,6 +100,7 @@ export function ProductMediaGallery({
       }
     } catch (error) {
       console.error("Failed to fetch media:", error);
+      toast.error("Failed to load media");
     } finally {
       setLoading(false);
     }
@@ -200,6 +202,9 @@ export function ProductMediaGallery({
       }
     } catch (error) {
       console.error("Failed to delete media:", error);
+      toast.error("Failed to delete media", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     }
   };
 
@@ -222,6 +227,9 @@ export function ProductMediaGallery({
       }
     } catch (error) {
       console.error("Failed to set primary:", error);
+      toast.error("Failed to set primary image", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     }
   };
 
@@ -268,6 +276,9 @@ export function ProductMediaGallery({
       });
     } catch (error) {
       console.error("Failed to reorder:", error);
+      toast.error("Failed to reorder media", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
       fetchMedia(); // Revert on error
     }
 

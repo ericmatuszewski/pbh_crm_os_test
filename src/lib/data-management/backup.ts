@@ -174,10 +174,12 @@ export async function getBackupForDownload(backupId: string, userId: string) {
   return backup;
 }
 
-export default {
+const backupService = {
   triggerBackup,
   getBackupStatus,
   listBackups,
   cleanupExpiredBackups,
   getBackupForDownload,
 };
+
+export default backupService;

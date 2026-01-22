@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveSessions, revokeAllUserSessions } from "@/lib/sessions/service";
+import { getCurrentUserId } from "@/lib/auth/get-current-user";
 
 // GET /api/users/[id]/sessions - Get user's active sessions
 export async function GET(
@@ -33,8 +34,8 @@ export async function DELETE(
     const { searchParams } = new URL(request.url);
     const reason = searchParams.get("reason") || "Admin action";
 
-    // TODO: Get actual user ID from session
-    const revokedById = "system";
+    // Get current user from session
+    const revokedById = await getCurrentUserId(request);
 
     const result = await revokeAllUserSessions(id, revokedById, reason);
 

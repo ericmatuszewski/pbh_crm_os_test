@@ -391,7 +391,7 @@ export async function listInvitations(businessId?: string) {
   });
 }
 
-export default {
+const invitationService = {
   generateInviteToken,
   createInvitation,
   validateInviteToken,
@@ -400,3 +400,5 @@ export default {
   revokeInvitation,
   listInvitations,
 };
+
+export default invitationService;

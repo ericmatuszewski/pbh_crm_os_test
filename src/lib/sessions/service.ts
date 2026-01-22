@@ -337,7 +337,7 @@ export async function getSessionStats() {
   };
 }
 
-export default {
+const sessionService = {
   parseUserAgent,
   createUserSession,
   updateSessionActivity,
@@ -348,3 +348,5 @@ export default {
   cleanupExpiredSessions,
   getSessionStats,
 };
+
+export default sessionService;

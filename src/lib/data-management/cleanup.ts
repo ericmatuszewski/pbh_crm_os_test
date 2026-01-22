@@ -249,10 +249,12 @@ export async function getCleanupStats() {
   };
 }
 
-export default {
+const cleanupService = {
   CLEANUP_ENTITIES,
   createCleanupConfiguration,
   getCleanupConfigurations,
   runCleanup,
   getCleanupStats,
 };
+
+export default cleanupService;

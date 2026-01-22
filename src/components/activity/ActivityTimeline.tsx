@@ -20,6 +20,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
 interface TimelineItem {
   id: string;
@@ -104,6 +105,9 @@ export function ActivityTimeline({
       }
     } catch (error) {
       console.error("Failed to fetch timeline:", error);
+      toast.error("Failed to load activity timeline", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setLoading(false);
     }

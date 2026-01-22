@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Save, Plus, X, AlertCircle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Attribute {
   id: string;
@@ -95,6 +96,9 @@ export function ProductAttributeEditor({
       }
     } catch (error) {
       console.error("Failed to fetch attribute data:", error);
+      toast.error("Failed to load attributes", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setLoading(false);
     }
@@ -218,6 +222,9 @@ export function ProductAttributeEditor({
       }
     } catch (error) {
       console.error("Failed to save attributes:", error);
+      toast.error("Failed to save attributes", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setSaving(false);
     }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createCampaignSchema, campaignFiltersSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
+import { getCurrentUserId } from "@/lib/auth/get-current-user";
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
         priority: data.priority || "MEDIUM",
         startDate: data.startDate ? new Date(data.startDate) : null,
         endDate: data.endDate ? new Date(data.endDate) : null,
-        createdById: "system", // TODO: Get from auth session
+        createdById: await getCurrentUserId(request),
       },
       include: {
         createdBy: { select: { id: true, name: true } },

@@ -32,6 +32,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const scheduleCallFormSchema = z.object({
   contactId: z.string().min(1, "Please select a contact"),
@@ -145,12 +146,19 @@ export function ScheduleCallForm({
       const result = await response.json();
 
       if (result.success) {
+        toast.success("Call scheduled successfully");
         onSuccess?.();
       } else {
         console.error("Failed to schedule call:", result.error);
+        toast.error("Failed to schedule call", {
+          description: result.error?.message || "Please try again"
+        });
       }
     } catch (error) {
       console.error("Error scheduling call:", error);
+      toast.error("Error scheduling call", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setIsSubmitting(false);
     }

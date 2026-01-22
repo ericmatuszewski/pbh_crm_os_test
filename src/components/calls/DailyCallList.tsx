@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CallButton } from "./PhoneDialer";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface ScheduledCall {
   id: string;
@@ -61,6 +62,9 @@ export function DailyCallList({
       }
     } catch (error) {
       console.error("Error fetching calls:", error);
+      toast.error("Error fetching calls", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setIsLoading(false);
     }

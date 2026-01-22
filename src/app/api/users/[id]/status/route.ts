@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { changeUserStatus } from "@/lib/users/service";
 import { UserStatus } from "@prisma/client";
+import { getCurrentUserId } from "@/lib/auth/get-current-user";
 
 // PATCH /api/users/[id]/status - Change user status
 export async function PATCH(
@@ -19,8 +20,8 @@ export async function PATCH(
       );
     }
 
-    // TODO: Get actual user ID from session
-    const changedById = "system";
+    // Get current user from session
+    const changedById = await getCurrentUserId(request);
 
     const user = await changeUserStatus(
       id,

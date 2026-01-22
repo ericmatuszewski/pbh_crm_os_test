@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserById, updateUser, deactivateUser, getUserActivitySummary } from "@/lib/users/service";
+import { getCurrentUserId } from "@/lib/auth/get-current-user";
 
 // GET /api/users/[id] - Get user details
 export async function GET(
@@ -50,8 +51,8 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
-    // TODO: Get actual user ID from session
-    const updatedById = "system";
+    // Get current user from session
+    const updatedById = await getCurrentUserId(request);
 
     // Only allow certain fields to be updated
     const allowedFields = ["name", "email", "phoneNumber", "timezone"];
@@ -85,8 +86,8 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    // TODO: Get actual user ID from session
-    const deletedById = "system";
+    // Get current user from session
+    const deletedById = await getCurrentUserId(request);
 
     const user = await deactivateUser(id, deletedById);
 

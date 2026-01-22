@@ -40,6 +40,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface ImportJob {
   id: string;
@@ -111,6 +112,9 @@ export function ImportJobList({ className, onRefresh }: ImportJobListProps) {
       }
     } catch (error) {
       console.error("Failed to fetch jobs:", error);
+      toast.error("Failed to load import jobs", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setLoading(false);
     }
@@ -148,6 +152,9 @@ export function ImportJobList({ className, onRefresh }: ImportJobListProps) {
       }
     } catch (error) {
       console.error("Failed to rollback:", error);
+      toast.error("Failed to rollback import", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setRollingBack(null);
     }

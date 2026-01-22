@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listInvitations, revokeInvitation } from "@/lib/users/invitation";
+import { getCurrentUserId } from "@/lib/auth/get-current-user";
 
 // GET /api/users/invitations - List pending invitations
 export async function GET(request: NextRequest) {
@@ -35,8 +36,8 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // TODO: Get actual user ID from session
-    const revokedById = "system";
+    // Get current user from session
+    const revokedById = await getCurrentUserId(request);
 
     const invitation = await revokeInvitation(invitationId, revokedById);
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { runCleanup, CleanupEntity, CLEANUP_ENTITIES } from "@/lib/data-management/cleanup";
+import { getCurrentUserId } from "@/lib/auth/get-current-user";
 
 // GET /api/admin/data/cleanup/[id] - Get cleanup configuration
 export async function GET(
@@ -25,8 +26,8 @@ export async function GET(
         );
       }
 
-      // TODO: Get actual user ID from session
-      const userId = "system";
+      // Get current user from session
+      const userId = await getCurrentUserId(request);
       const result = await runCleanup(config.entity as CleanupEntity, userId);
 
       return NextResponse.json({
@@ -120,7 +121,7 @@ export async function POST(
 
     if (entity) {
       // Direct cleanup by entity name
-      const userId = "system";
+      const userId = await getCurrentUserId(request);
       const result = await runCleanup(entity, userId);
 
       return NextResponse.json({
@@ -142,8 +143,8 @@ export async function POST(
       );
     }
 
-    // TODO: Get actual user ID from session
-    const userId = "system";
+    // Get current user from session
+    const userId = await getCurrentUserId(request);
     const result = await runCleanup(config.entity as CleanupEntity, userId);
 
     return NextResponse.json({

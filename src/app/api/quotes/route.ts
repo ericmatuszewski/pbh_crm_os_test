@@ -7,6 +7,7 @@ import {
   buildBusinessScopeFilter,
   generateQuoteNumber,
 } from "@/lib/business";
+import { getCurrentUserId } from "@/lib/auth/get-current-user";
 
 export async function GET(request: NextRequest) {
   try {
@@ -167,7 +168,7 @@ export async function POST(request: NextRequest) {
         logoUrl: data.logoUrl || null,
         companyName: data.companyName || null,
         companyAddress: data.companyAddress || null,
-        createdById: "system", // TODO: Get from auth session
+        createdById: await getCurrentUserId(request),
         items: {
           create: items,
         },

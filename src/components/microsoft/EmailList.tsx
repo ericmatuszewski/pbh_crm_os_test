@@ -31,6 +31,7 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { Email, Mailbox } from "./types";
 
 interface EmailListProps {
@@ -93,6 +94,9 @@ export function EmailList({
       }
     } catch (error) {
       console.error("Failed to fetch emails:", error);
+      toast.error("Failed to load emails", {
+        description: error instanceof Error ? error.message : "Please try again"
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);

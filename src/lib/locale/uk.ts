@@ -463,7 +463,7 @@ export const UK_DEFAULTS = {
 // EXPORTS
 // ============================================================================
 
-export default {
+const ukLocale = {
   // Date
   formatDateUK,
   formatDateShortUK,
@@ -501,3 +501,5 @@ export default {
   // Defaults
   UK_DEFAULTS,
 };
+
+export default ukLocale;

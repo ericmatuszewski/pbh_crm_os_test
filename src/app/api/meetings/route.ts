@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { triggerMeetingBooked } from "@/lib/scoring/trigger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -110,6 +111,11 @@ export async function POST(request: NextRequest) {
         dealId,
       },
     });
+
+    // Trigger lead scoring for MEETING_BOOKED event
+    if (contactId) {
+      await triggerMeetingBooked(contactId, meeting.id, title);
+    }
 
     return NextResponse.json({ success: true, data: meeting }, { status: 201 });
   } catch (error) {

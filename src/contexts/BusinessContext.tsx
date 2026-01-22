@@ -98,6 +98,7 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
       }
     } catch (error) {
       console.error("Failed to fetch businesses:", error);
+      toast.error("Failed to load businesses");
     } finally {
       setIsLoading(false);
     }

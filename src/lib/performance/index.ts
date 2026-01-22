@@ -421,7 +421,7 @@ export async function cleanupOldMetrics(daysOld: number = 7): Promise<number> {
   return result.count + queryResult.count;
 }
 
-export default {
+const performanceService = {
   recordResponseMetrics,
   withTiming,
   recordSlowQuery,
@@ -432,3 +432,5 @@ export default {
   getHealthStatus,
   cleanupOldMetrics,
 };
+
+export default performanceService;

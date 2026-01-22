@@ -13,6 +13,7 @@ import {
 import { CsvConnector } from "./csv";
 import { JsonConnector } from "./json";
 import { PostgreSqlConnector } from "./postgresql";
+import { encryptObject, decryptObject, isEncrypted } from "@/lib/crypto/encryption";
 
 /**
  * Connector Factory
@@ -135,23 +136,30 @@ export class ConnectorFactory {
 }
 
 /**
- * Decrypt connection configuration
- * In production, this should use proper encryption
+ * Decrypt connection configuration from storage
+ * Handles both encrypted (string) and legacy unencrypted (object) formats
  */
 export function decryptConnectionConfig(encrypted: unknown): ConnectionConfig {
-  // For now, just return as-is
-  // TODO: Implement proper encryption/decryption
-  return encrypted as ConnectionConfig;
+  // Handle string (encrypted) format
+  if (typeof encrypted === "string" && isEncrypted(encrypted)) {
+    return decryptObject<ConnectionConfig>(encrypted);
+  }
+
+  // Handle legacy unencrypted object format
+  // This allows backward compatibility with existing data
+  if (typeof encrypted === "object" && encrypted !== null) {
+    return encrypted as ConnectionConfig;
+  }
+
+  throw new Error("Invalid connection configuration format");
 }
 
 /**
- * Encrypt connection configuration for storage
- * In production, this should use proper encryption
+ * Encrypt connection configuration for secure storage
+ * Uses AES-256-CBC encryption for database credentials and API keys
  */
-export function encryptConnectionConfig(config: ConnectionConfig): unknown {
-  // For now, just return as-is
-  // TODO: Implement proper encryption
-  return config;
+export function encryptConnectionConfig(config: ConnectionConfig): string {
+  return encryptObject(config);
 }
 
 /**

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { triggerBackup, listBackups } from "@/lib/data-management/backup";
+import { getCurrentUser } from "@/lib/auth/get-current-user";
 
 // GET /api/admin/data/backup - List backups
 export async function GET(request: NextRequest) {
@@ -28,9 +29,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { backupType = "full", expiresInDays = 30 } = body;
 
-    // TODO: Get actual user ID and name from session
-    const triggeredById = "system";
-    const triggeredByName = "System";
+    // Get current user from session
+    const currentUser = await getCurrentUser(request);
+    const triggeredById = currentUser.id;
+    const triggeredByName = currentUser.name;
 
     const backup = await triggerBackup({
       triggeredById,
