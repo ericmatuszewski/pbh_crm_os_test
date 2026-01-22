@@ -80,14 +80,14 @@ const settingsSections = [
     description: "Configure email and in-app notification preferences",
     href: "/settings/notifications",
     icon: Bell,
-    badge: "Coming Soon",
+    badge: null,
   },
   {
     title: "Security",
     description: "Manage password policies, two-factor authentication, and sessions",
     href: "/settings/security",
     icon: Shield,
-    badge: "Coming Soon",
+    badge: null,
   },
   {
     title: "Data Management",
@@ -108,7 +108,7 @@ const settingsSections = [
     description: "Customize the look and feel of your CRM",
     href: "/settings/appearance",
     icon: Palette,
-    badge: "Coming Soon",
+    badge: null,
   },
 ];
 
