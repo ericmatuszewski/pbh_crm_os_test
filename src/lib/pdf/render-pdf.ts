@@ -14,9 +14,13 @@ export async function renderPDFToBuffer(
   const element = React.createElement(Component, props);
 
   try {
-    // Try using renderToBuffer first
-    const buffer = await ReactPDF.renderToBuffer(element);
-    return Buffer.from(buffer);
+    // Try using renderToBuffer first (cast to any to handle type mismatch)
+    const pdfModule = ReactPDF as any;
+    if (typeof pdfModule.renderToBuffer === "function") {
+      const buffer = await pdfModule.renderToBuffer(element);
+      return Buffer.from(buffer);
+    }
+    throw new Error("renderToBuffer not available");
   } catch {
     // Fallback to pdf().toBuffer()
     const doc = ReactPDF.pdf(element);

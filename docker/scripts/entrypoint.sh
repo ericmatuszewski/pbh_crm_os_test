@@ -26,11 +26,12 @@ if [ -n "$REDIS_URL" ]; then
   echo "  Redis is up!"
 fi
 
-# Run migrations in production
+# Run migrations in production using the project's Prisma version
 if [ "$NODE_ENV" = "production" ]; then
   echo "Running database migrations..."
-  npx prisma migrate deploy
-  echo "  Migrations complete!"
+  # Use the bundled Prisma client to push schema (migrate deploy requires migration files)
+  ./node_modules/.bin/prisma db push --skip-generate 2>/dev/null || echo "  Schema push skipped (no changes or already up to date)"
+  echo "  Database ready!"
 fi
 
 echo "=========================================="

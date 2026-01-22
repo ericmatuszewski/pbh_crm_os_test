@@ -208,6 +208,10 @@ model User {
   mfaEnabled        Boolean    @default(false)
   mfaSecret         String?
 
+  // External authentication (LDAP/SSO)
+  authProvider      String?    // LDAP, SAML, OIDC, etc.
+  externalId        String?    // DN or external identifier
+
   // Profile
   phoneNumber       String?
   timezone          String?    @default("Europe/London")

@@ -1,0 +1,141 @@
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import prisma from "@/lib/prisma";
+import { authenticateAD, isLDAPConfigured } from "@/lib/auth/ldap";
+import { createUserSession, parseUserAgent } from "@/lib/sessions/service";
+import crypto from "crypto";
+
+export const dynamic = "force-dynamic";
+
+// Session duration: 8 hours (typical workday)
+const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { username, password } = body;
+
+    if (!username || !password) {
+      return NextResponse.json(
+        { success: false, error: { message: "Username and password required" } },
+        { status: 400 }
+      );
+    }
+
+    // Check if LDAP is configured
+    if (!isLDAPConfigured()) {
+      return NextResponse.json(
+        { success: false, error: { message: "Authentication not configured" } },
+        { status: 500 }
+      );
+    }
+
+    // Authenticate against AD
+    const authResult = await authenticateAD(username, password);
+
+    if (!authResult.success || !authResult.user) {
+      return NextResponse.json(
+        { success: false, error: { message: authResult.error || "Authentication failed" } },
+        { status: 401 }
+      );
+    }
+
+    const adUser = authResult.user;
+
+    // Find or create user in database
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: adUser.mail },
+          { email: adUser.userPrincipalName },
+          { name: adUser.sAMAccountName },
+        ],
+      },
+    });
+
+    if (!user) {
+      // Get default business (or first one)
+      const business = await prisma.business.findFirst();
+
+      // Create new user from AD info
+      user = await prisma.user.create({
+        data: {
+          email: adUser.mail || adUser.userPrincipalName || `${adUser.sAMAccountName}@nobutts.com`,
+          name: adUser.displayName || `${adUser.givenName} ${adUser.sn}`.trim() || adUser.sAMAccountName,
+          status: "ACTIVE",
+          authProvider: "LDAP",
+          externalId: adUser.dn,
+        },
+      });
+
+      // If a default business exists, associate user with it
+      if (business) {
+        await prisma.userBusiness.create({
+          data: {
+            userId: user.id,
+            businessId: business.id,
+            isDefault: true,
+          },
+        });
+      }
+    } else if (user.status !== "ACTIVE") {
+      return NextResponse.json(
+        { success: false, error: { message: "User account is disabled" } },
+        { status: 403 }
+      );
+    }
+
+    // Generate session token
+    const sessionToken = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
+
+    // Get device/location info
+    const userAgent = request.headers.get("user-agent") || "";
+    const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+      || request.headers.get("x-real-ip")
+      || "unknown";
+
+    // Create session
+    await createUserSession(
+      sessionToken,
+      user.id,
+      userAgent,
+      { ipAddress },
+      expiresAt
+    );
+
+    // Update user last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Set session cookie
+    const cookieStore = await cookies();
+    cookieStore.set("session-token", sessionToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      expires: expiresAt,
+      path: "/",
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+        },
+        expiresAt: expiresAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    return NextResponse.json(
+      { success: false, error: { message: "Login failed" } },
+      { status: 500 }
+    );
+  }
+}
