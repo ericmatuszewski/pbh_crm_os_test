@@ -97,70 +97,59 @@ function searchAsync(
 
 /**
  * Parse LDAP entry to ADUser
- * ldapjs returns entries with pojo (plain object) representation
+ * ldapjs returns entries with pojo.attributes array
  */
 function parseADUser(entry: ldap.SearchEntry): ADUser {
-  // Cast to any to handle ldapjs internal structure
   const entryAny = entry as any;
+  const pojo = entryAny.pojo;
 
-  // Try different ways to access the object representation
-  const obj = entryAny.pojo || entryAny.object || entryAny;
-
-  // Helper to get attribute value from various formats
+  // Helper to get single attribute value from pojo.attributes array
   const getAttr = (name: string): string => {
-    // Try direct property access (pojo format)
-    if (obj[name] !== undefined) {
-      const val = obj[name];
-      if (Array.isArray(val)) return val[0]?.toString() || "";
-      return val?.toString() || "";
-    }
-
-    // Try attributes array format
-    if (obj.attributes && Array.isArray(obj.attributes)) {
-      const attr = obj.attributes.find((a: any) =>
+    if (pojo && pojo.attributes && Array.isArray(pojo.attributes)) {
+      const attr = pojo.attributes.find((a: any) =>
         a.type?.toLowerCase() === name.toLowerCase()
       );
-      if (attr) {
-        const vals = attr.values || attr._vals || [];
-        return vals[0]?.toString() || "";
+      if (attr && attr.values && attr.values.length > 0) {
+        return attr.values[0]?.toString() || "";
       }
     }
-
     return "";
   };
 
-  const getMemberOf = (): string[] => {
-    // Try direct property access
-    if (obj.memberOf !== undefined) {
-      const val = obj.memberOf;
-      if (Array.isArray(val)) return val.map((v: any) => v.toString());
-      return val ? [val.toString()] : [];
-    }
-
-    // Try attributes array format
-    if (obj.attributes && Array.isArray(obj.attributes)) {
-      const attr = obj.attributes.find((a: any) =>
-        a.type?.toLowerCase() === "memberof"
+  // Helper to get multi-valued attribute
+  const getAttrAll = (name: string): string[] => {
+    if (pojo && pojo.attributes && Array.isArray(pojo.attributes)) {
+      const attr = pojo.attributes.find((a: any) =>
+        a.type?.toLowerCase() === name.toLowerCase()
       );
-      if (attr) {
-        const vals = attr.values || attr._vals || [];
-        return vals.map((v: any) => v.toString());
+      if (attr && attr.values) {
+        return attr.values.map((v: any) => v?.toString() || "");
       }
     }
-
     return [];
   };
 
-  return {
-    dn: entry.dn?.toString() || obj.dn || "",
+  const dn = entry.dn?.toString() || pojo?.dn || "";
+  const parsed = {
+    dn,
     sAMAccountName: getAttr("sAMAccountName"),
     userPrincipalName: getAttr("userPrincipalName"),
     displayName: getAttr("displayName") || getAttr("cn"),
     givenName: getAttr("givenName"),
     sn: getAttr("sn"),
     mail: getAttr("mail"),
-    memberOf: getMemberOf(),
+    memberOf: getAttrAll("memberOf"),
   };
+
+  console.log("[LDAP] Parsed user attributes:", {
+    dn: parsed.dn,
+    sAMAccountName: parsed.sAMAccountName,
+    displayName: parsed.displayName,
+    mail: parsed.mail,
+    memberOfCount: parsed.memberOf.length,
+  });
+
+  return parsed;
 }
 
 /**
@@ -172,18 +161,42 @@ export async function authenticateAD(
 ): Promise<{ success: boolean; user?: ADUser; error?: string }> {
   const config = getLDAPConfig();
 
+  console.log("[LDAP] Starting authentication for username:", username);
+  console.log("[LDAP] Config:", {
+    url: config.url,
+    bindDN: config.bindDN,
+    baseDN: config.baseDN,
+    userSearchFilter: config.userSearchFilter,
+    groupDN: config.groupDN,
+  });
+
   if (!config.bindDN || !config.bindPassword) {
+    console.log("[LDAP] Not configured - missing bindDN or bindPassword");
     return { success: false, error: "LDAP not configured" };
   }
+
+  // Strip domain prefix if provided (e.g., "nobutts\eric" -> "eric")
+  const cleanUsername = username.includes("\\")
+    ? username.split("\\")[1]
+    : username.includes("/")
+      ? username.split("/")[1]
+      : username;
+
+  console.log("[LDAP] Clean username (stripped domain):", cleanUsername);
 
   const client = createClient(config.url);
 
   try {
     // First, bind with service account to search for user
+    console.log("[LDAP] Binding with service account...");
     await bindAsync(client, config.bindDN, config.bindPassword);
+    console.log("[LDAP] Service account bind successful");
 
-    // Search for the user
-    const filter = config.userSearchFilter.replace("{{username}}", username);
+    console.log("[LDAP] Search base DN:", config.baseDN);
+
+    // Use simple sAMAccountName filter (works reliably)
+    const filter = `(sAMAccountName=${cleanUsername})`;
+    console.log("[LDAP] Using filter:", filter);
     const searchOptions: ldap.SearchOptions = {
       filter,
       scope: "sub",
@@ -201,20 +214,32 @@ export async function authenticateAD(
     };
 
     const entries = await searchAsync(client, config.baseDN, searchOptions);
+    console.log("[LDAP] Search returned", entries.length, "entries");
 
     if (entries.length === 0) {
       client.unbind();
+      console.log("[LDAP] No user found matching filter");
       return { success: false, error: "User not found" };
     }
 
     const userEntry = entries[0];
     const user = parseADUser(userEntry);
+    console.log("[LDAP] Parsed user:", {
+      dn: user.dn,
+      sAMAccountName: user.sAMAccountName,
+      displayName: user.displayName,
+      mail: user.mail,
+      memberOf: user.memberOf.length + " groups",
+    });
 
     // Check group membership if configured
     if (config.groupDN) {
+      console.log("[LDAP] Checking group membership for:", config.groupDN);
+      console.log("[LDAP] User groups:", user.memberOf);
       const isMember = user.memberOf.some((group) =>
         group.toLowerCase().includes(config.groupDN.toLowerCase())
       );
+      console.log("[LDAP] Is member:", isMember);
       if (!isMember) {
         client.unbind();
         return { success: false, error: "User not in authorized group" };
@@ -222,22 +247,26 @@ export async function authenticateAD(
     }
 
     // Now try to bind as the user to verify password
+    console.log("[LDAP] Verifying user password by binding as user DN:", user.dn);
     const userClient = createClient(config.url);
     try {
       // Try binding with the user's DN and password
       await bindAsync(userClient, user.dn, password);
+      console.log("[LDAP] User password verified successfully");
       userClient.unbind();
     } catch (bindError) {
+      console.log("[LDAP] User password verification failed:", bindError);
       userClient.unbind();
       client.unbind();
       return { success: false, error: "Invalid credentials" };
     }
 
     client.unbind();
+    console.log("[LDAP] Authentication successful for:", user.sAMAccountName);
     return { success: true, user };
   } catch (error) {
     client.unbind();
-    console.error("LDAP authentication error:", error);
+    console.error("[LDAP] Authentication error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Authentication failed",

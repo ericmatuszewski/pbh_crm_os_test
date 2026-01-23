@@ -73,6 +73,18 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
+# Copy ldapjs and its dependencies (not traced by Next.js standalone)
+COPY --from=deps /app/node_modules/ldapjs ./node_modules/ldapjs
+COPY --from=deps /app/node_modules/@ldapjs ./node_modules/@ldapjs
+COPY --from=deps /app/node_modules/abstract-logging ./node_modules/abstract-logging
+COPY --from=deps /app/node_modules/assert-plus ./node_modules/assert-plus
+COPY --from=deps /app/node_modules/backoff ./node_modules/backoff
+COPY --from=deps /app/node_modules/vasync ./node_modules/vasync
+COPY --from=deps /app/node_modules/verror ./node_modules/verror
+COPY --from=deps /app/node_modules/extsprintf ./node_modules/extsprintf
+COPY --from=deps /app/node_modules/core-util-is ./node_modules/core-util-is
+COPY --from=deps /app/node_modules/precond ./node_modules/precond
+
 # Copy entrypoint script
 COPY docker/scripts/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh

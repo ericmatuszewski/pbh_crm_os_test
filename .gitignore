@@ -37,3 +37,4 @@ tsconfig.tsbuildinfo
 .worktrees/
 .security-key
 logs/security/
+.env.docker

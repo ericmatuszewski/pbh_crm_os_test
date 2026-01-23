@@ -35,6 +35,7 @@ const nextConfig = {
       "@react-pdf/renderer",
       "@react-pdf/pdfkit",
       "@react-pdf/layout",
+      "ldapjs",
     ],
   },
   images: {

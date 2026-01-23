@@ -6,6 +6,7 @@ const publicPaths = [
   "/login",
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/me",
   "/api/health",
   "/_next",
   "/favicon.ico",
@@ -27,14 +28,24 @@ export function middleware(request: NextRequest) {
   // Check for session token
   const sessionToken = request.cookies.get("session-token")?.value;
 
-  // If no session and trying to access protected route, redirect to login
+  // If no session and trying to access protected route
   if (!sessionToken) {
+    // For API routes, return 401 JSON
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        { success: false, error: { message: "Unauthorized" } },
+        { status: 401 }
+      );
+    }
+    // For other routes, redirect to login
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Session exists, allow request
+  // Session token exists - pass request through
+  // Full session validation is done by individual API routes via getServerSession()
+  // This prevents database calls in edge middleware
   return NextResponse.next();
 }
 

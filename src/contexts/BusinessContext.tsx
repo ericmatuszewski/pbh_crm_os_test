@@ -41,10 +41,17 @@ export interface Business {
   isDefault?: boolean;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
 interface BusinessContextType {
   currentBusiness: Business | null;
   businesses: Business[];
   isLoading: boolean;
+  currentUser: User | null;
   switchBusiness: (businessId: string) => Promise<void>;
   refreshBusinesses: () => Promise<void>;
 }
@@ -53,9 +60,6 @@ const BusinessContext = createContext<BusinessContextType | undefined>(
   undefined
 );
 
-// Temporary user ID - in real app, get from auth session
-const CURRENT_USER_ID = "allison";
-
 interface BusinessProviderProps {
   children: ReactNode;
 }
@@ -63,12 +67,13 @@ interface BusinessProviderProps {
 export function BusinessProvider({ children }: BusinessProviderProps) {
   const [currentBusiness, setCurrentBusiness] = useState<Business | null>(null);
   const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchBusinesses = useCallback(async () => {
+  const fetchBusinesses = useCallback(async (userId: string) => {
     try {
       const response = await fetch(
-        `/api/businesses?userId=${CURRENT_USER_ID}`
+        `/api/businesses?userId=${userId}`
       );
       const data = await response.json();
 
@@ -104,18 +109,38 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
     }
   }, []);
 
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      const data = await response.json();
+
+      if (data.success && data.data?.user) {
+        setCurrentUser(data.data.user);
+        return data.data.user;
+      }
+      return null;
+    } catch (error) {
+      console.error("Failed to fetch current user:", error);
+      return null;
+    }
+  }, []);
+
   const refreshBusinesses = useCallback(async () => {
-    await fetchBusinesses();
-  }, [fetchBusinesses]);
+    if (currentUser) {
+      await fetchBusinesses(currentUser.id);
+    }
+  }, [fetchBusinesses, currentUser]);
 
   const switchBusiness = useCallback(
     async (businessId: string) => {
+      if (!currentUser) return;
+
       try {
         const response = await fetch("/api/businesses/switch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userId: CURRENT_USER_ID,
+            userId: currentUser.id,
             businessId,
           }),
         });
@@ -141,8 +166,16 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
   );
 
   useEffect(() => {
-    fetchBusinesses();
-  }, [fetchBusinesses]);
+    const init = async () => {
+      const user = await fetchCurrentUser();
+      if (user) {
+        await fetchBusinesses(user.id);
+      } else {
+        setIsLoading(false);
+      }
+    };
+    init();
+  }, [fetchCurrentUser, fetchBusinesses]);
 
   return (
     <BusinessContext.Provider
@@ -150,6 +183,7 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
         currentBusiness,
         businesses,
         isLoading,
+        currentUser,
         switchBusiness,
         refreshBusinesses,
       }}
