@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { createTaskSchema, taskFiltersSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
 import { getCurrentBusiness, buildBusinessScopeFilter } from "@/lib/business";
+import { getCurrentUserId } from "@/lib/auth/get-current-user";
 
 export async function GET(request: NextRequest) {
   try {
@@ -74,7 +75,17 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const data = createTaskSchema.parse(body);
+
+    // Get current user to use as default assignee
+    const currentUserId = await getCurrentUserId(request);
+
+    // Default assigneeId to current user if not provided
+    const dataWithAssignee = {
+      ...body,
+      assigneeId: body.assigneeId || currentUserId,
+    };
+
+    const data = createTaskSchema.parse(dataWithAssignee);
 
     // Get current business
     const business = await getCurrentBusiness(request);

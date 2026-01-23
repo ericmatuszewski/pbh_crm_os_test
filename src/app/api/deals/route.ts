@@ -4,6 +4,7 @@ import { createDealSchema, dealFiltersSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
 import { getCurrentBusiness, buildBusinessScopeFilter } from "@/lib/business";
 import { triggerDealCreated } from "@/lib/scoring/trigger";
+import { getCurrentUserId } from "@/lib/auth/get-current-user";
 
 export async function GET(request: NextRequest) {
   try {
@@ -97,7 +98,17 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const data = createDealSchema.parse(body);
+
+    // Get current user to use as default owner
+    const currentUserId = await getCurrentUserId(request);
+
+    // Default ownerId to current user if not provided
+    const dataWithOwner = {
+      ...body,
+      ownerId: body.ownerId || currentUserId,
+    };
+
+    const data = createDealSchema.parse(dataWithOwner);
 
     // Get current business
     const business = await getCurrentBusiness(request);
