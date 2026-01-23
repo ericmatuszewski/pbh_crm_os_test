@@ -96,7 +96,7 @@ function parseADDetails(entry: ldap.SearchEntry): ADUserDetails {
   };
 }
 
-async function fetchADUserDetails(username: string): Promise<ADUserDetails | null> {
+async function fetchADUserDetails(externalId: string): Promise<ADUserDetails | null> {
   const config = getLDAPConfig();
 
   if (!config.bindDN || !config.bindPassword) {
@@ -108,26 +108,54 @@ async function fetchADUserDetails(username: string): Promise<ADUserDetails | nul
   try {
     await bindAsync(client, config.bindDN, config.bindPassword);
 
-    const filter = `(sAMAccountName=${username})`;
-    const searchOptions: ldap.SearchOptions = {
-      filter,
-      scope: "sub",
-      attributes: [
-        "dn",
-        "sAMAccountName",
-        "displayName",
-        "givenName",
-        "sn",
-        "mail",
-        "cn",
-        "title",
-        "department",
-        "telephoneNumber",
-        "mobile",
-      ],
-    };
+    // Check if externalId is a DN (starts with CN=) or a sAMAccountName
+    const isDN = externalId.toUpperCase().startsWith("CN=");
 
-    const entries = await searchAsync(client, config.baseDN, searchOptions);
+    let searchBase: string;
+    let searchOptions: ldap.SearchOptions;
+
+    if (isDN) {
+      // Search directly at the DN with base scope
+      searchBase = externalId;
+      searchOptions = {
+        scope: "base",
+        attributes: [
+          "dn",
+          "sAMAccountName",
+          "displayName",
+          "givenName",
+          "sn",
+          "mail",
+          "cn",
+          "title",
+          "department",
+          "telephoneNumber",
+          "mobile",
+        ],
+      };
+    } else {
+      // Search by sAMAccountName
+      searchBase = config.baseDN;
+      searchOptions = {
+        filter: `(sAMAccountName=${externalId})`,
+        scope: "sub",
+        attributes: [
+          "dn",
+          "sAMAccountName",
+          "displayName",
+          "givenName",
+          "sn",
+          "mail",
+          "cn",
+          "title",
+          "department",
+          "telephoneNumber",
+          "mobile",
+        ],
+      };
+    }
+
+    const entries = await searchAsync(client, searchBase, searchOptions);
 
     if (entries.length === 0) {
       client.unbind();
@@ -175,17 +203,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get username from externalId (sAMAccountName)
-    const username = user.externalId;
-    if (!username) {
+    // Get externalId (DN or sAMAccountName)
+    const externalId = user.externalId;
+    if (!externalId) {
       return NextResponse.json(
-        { success: false, error: { message: "No AD username found for user" } },
+        { success: false, error: { message: "No AD identifier found for user" } },
         { status: 400 }
       );
     }
 
     // Fetch latest details from AD
-    const adDetails = await fetchADUserDetails(username);
+    const adDetails = await fetchADUserDetails(externalId);
 
     if (!adDetails) {
       return NextResponse.json(
