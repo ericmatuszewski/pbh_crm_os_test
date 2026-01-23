@@ -42,6 +42,7 @@ import {
   ChevronRight,
   Mail,
   Settings,
+  Loader2,
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
@@ -73,9 +74,6 @@ interface NotificationPreference {
   emailDigest: boolean;
   emailImmediate: boolean;
 }
-
-// Temporary user ID (in real app, get from session)
-const CURRENT_USER_ID = "user-1";
 
 const NOTIFICATION_TYPES = [
   { value: "DEAL_STAGE_CHANGE", label: "Deal Stage Changes", icon: Target },
@@ -120,12 +118,31 @@ export default function NotificationsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [stats, setStats] = useState({ total: 0, unread: 0, byType: {} as Record<string, number> });
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Fetch current user on mount
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await fetch("/api/auth/me");
+        const data = await response.json();
+        if (data.success && data.data?.user?.id) {
+          setCurrentUserId(data.data.user.id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch current user:", error);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
 
   const fetchNotifications = useCallback(async (showArchived: boolean = false) => {
+    if (!currentUserId) return;
+
     setIsLoading(true);
     try {
       const params = new URLSearchParams();
-      params.set("userId", CURRENT_USER_ID);
+      params.set("userId", currentUserId);
       params.set("isArchived", showArchived.toString());
       if (typeFilter && typeFilter !== "__all__") params.set("type", typeFilter);
       params.set("page", page.toString());
@@ -144,11 +161,13 @@ export default function NotificationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [typeFilter, page]);
+  }, [typeFilter, page, currentUserId]);
 
   const fetchPreferences = useCallback(async () => {
+    if (!currentUserId) return;
+
     try {
-      const response = await fetch(`/api/notifications/preferences?userId=${CURRENT_USER_ID}`);
+      const response = await fetch(`/api/notifications/preferences?userId=${currentUserId}`);
       const data = await response.json();
       if (data.success) {
         setPreferences(data.data);
@@ -156,21 +175,24 @@ export default function NotificationsPage() {
     } catch (error) {
       console.error("Failed to fetch preferences:", error);
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
+    if (!currentUserId) return;
+
     if (activeTab === "inbox" || activeTab === "archived") {
       fetchNotifications(activeTab === "archived");
     } else if (activeTab === "settings") {
       fetchPreferences();
     }
-  }, [activeTab, fetchNotifications, fetchPreferences]);
+  }, [activeTab, fetchNotifications, fetchPreferences, currentUserId]);
 
   useEffect(() => {
     setSelectedIds(new Set());
   }, [activeTab, page]);
 
   const handleMarkAsRead = async (ids?: string[]) => {
+    if (!currentUserId) return;
     const toMark = ids || Array.from(selectedIds);
     if (toMark.length === 0) return;
 
@@ -178,7 +200,7 @@ export default function NotificationsPage() {
       await fetch("/api/notifications", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: CURRENT_USER_ID, ids: toMark, isRead: true }),
+        body: JSON.stringify({ userId: currentUserId, ids: toMark, isRead: true }),
       });
       toast.success(`Marked ${toMark.length} notification(s) as read`);
       fetchNotifications(activeTab === "archived");
@@ -190,11 +212,12 @@ export default function NotificationsPage() {
   };
 
   const handleMarkAllAsRead = async () => {
+    if (!currentUserId) return;
     try {
       await fetch("/api/notifications", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: CURRENT_USER_ID, markAllRead: true }),
+        body: JSON.stringify({ userId: currentUserId, markAllRead: true }),
       });
       toast.success("All notifications marked as read");
       fetchNotifications(activeTab === "archived");
@@ -205,6 +228,7 @@ export default function NotificationsPage() {
   };
 
   const handleArchive = async (ids?: string[]) => {
+    if (!currentUserId) return;
     const toArchive = ids || Array.from(selectedIds);
     if (toArchive.length === 0) return;
 
@@ -212,7 +236,7 @@ export default function NotificationsPage() {
       await fetch("/api/notifications", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: CURRENT_USER_ID, ids: toArchive, isArchived: true }),
+        body: JSON.stringify({ userId: currentUserId, ids: toArchive, isArchived: true }),
       });
       toast.success(`Archived ${toArchive.length} notification(s)`);
       fetchNotifications(activeTab === "archived");
@@ -224,6 +248,7 @@ export default function NotificationsPage() {
   };
 
   const handleDelete = async (ids?: string[]) => {
+    if (!currentUserId) return;
     const toDelete = ids || Array.from(selectedIds);
     if (toDelete.length === 0) return;
 
@@ -231,7 +256,7 @@ export default function NotificationsPage() {
       await fetch("/api/notifications", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: CURRENT_USER_ID, ids: toDelete }),
+        body: JSON.stringify({ userId: currentUserId, ids: toDelete }),
       });
       toast.success(`Deleted ${toDelete.length} notification(s)`);
       fetchNotifications(activeTab === "archived");
@@ -243,12 +268,13 @@ export default function NotificationsPage() {
   };
 
   const handlePreferenceChange = async (type: string, field: string, value: boolean) => {
+    if (!currentUserId) return;
     try {
       await fetch("/api/notifications/preferences", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: CURRENT_USER_ID,
+          userId: currentUserId,
           type,
           [field]: value,
         }),
