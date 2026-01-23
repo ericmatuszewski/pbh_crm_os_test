@@ -92,8 +92,6 @@ interface DocumentVersion {
   createdAt: string;
 }
 
-const MOCK_USER_ID = "user-1";
-
 const fileTypeIcons: Record<string, React.ReactNode> = {
   PDF: <FileText className="h-8 w-8 text-red-500" />,
   IMAGE: <ImageIcon className="h-8 w-8 text-blue-500" />,
@@ -124,6 +122,7 @@ export default function DocumentsPage() {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -131,6 +130,22 @@ export default function DocumentsPage() {
   const [uploadDescription, setUploadDescription] = useState("");
   const [uploadEntityType, setUploadEntityType] = useState("general");
   const [uploadEntityId, setUploadEntityId] = useState("general");
+
+  // Fetch current user on mount
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await fetch("/api/auth/me");
+        const data = await response.json();
+        if (data.success && data.data?.user?.id) {
+          setCurrentUserId(data.data.user.id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch current user:", error);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -176,7 +191,7 @@ export default function DocumentsPage() {
       formData.append("description", uploadDescription);
       formData.append("entityType", uploadEntityType);
       formData.append("entityId", uploadEntityId);
-      formData.append("userId", MOCK_USER_ID);
+      formData.append("userId", currentUserId);
 
       const res = await fetch("/api/documents", {
         method: "POST",

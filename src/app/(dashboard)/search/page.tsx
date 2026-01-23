@@ -150,9 +150,6 @@ const entityFields: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
-// Mock user ID for demo
-const MOCK_USER_ID = "user-1";
-
 function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -172,20 +169,39 @@ function SearchPageContent() {
   const [newViewName, setNewViewName] = useState("");
   const [newViewDescription, setNewViewDescription] = useState("");
   const [newViewIsShared, setNewViewIsShared] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  // Fetch current user on mount
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await fetch("/api/auth/me");
+        const data = await response.json();
+        if (data.success && data.data?.user?.id) {
+          setCurrentUserId(data.data.user.id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch current user:", error);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
 
   // Load recently viewed and saved views
   useEffect(() => {
+    if (!currentUserId) return;
+
     const loadData = async () => {
       try {
         // Load recently viewed
-        const rvRes = await fetch(`/api/recently-viewed?userId=${MOCK_USER_ID}&limit=10`);
+        const rvRes = await fetch(`/api/recently-viewed?userId=${currentUserId}&limit=10`);
         const rvData = await rvRes.json();
         if (rvData.success) {
           setRecentlyViewed(rvData.data);
         }
 
         // Load saved views
-        const svRes = await fetch(`/api/saved-views?userId=${MOCK_USER_ID}&includeShared=true`);
+        const svRes = await fetch(`/api/saved-views?userId=${currentUserId}&includeShared=true`);
         const svData = await svRes.json();
         if (svData.success) {
           setSavedViews(svData.data);
@@ -196,7 +212,7 @@ function SearchPageContent() {
     };
 
     loadData();
-  }, []);
+  }, [currentUserId]);
 
   // Search function
   const performSearch = useCallback(async (searchQuery: string, entity?: string) => {
@@ -210,7 +226,7 @@ function SearchPageContent() {
     try {
       const params = new URLSearchParams({
         q: searchQuery,
-        userId: MOCK_USER_ID,
+        userId: currentUserId,
         limit: "50",
       });
       if (entity) {
@@ -246,7 +262,7 @@ function SearchPageContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: MOCK_USER_ID,
+          userId: currentUserId,
           entity: result.entity,
           entityId: result.id,
           entityName: result.title,
@@ -294,7 +310,7 @@ function SearchPageContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: MOCK_USER_ID,
+          userId: currentUserId,
           name: newViewName,
           description: newViewDescription || null,
           entity: selectedEntity === "__all__" ? "all" : (selectedEntity || "all"),
@@ -347,7 +363,7 @@ function SearchPageContent() {
       await fetch("/api/recently-viewed", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: MOCK_USER_ID }),
+        body: JSON.stringify({ userId: currentUserId }),
       });
       setRecentlyViewed([]);
     } catch (error) {

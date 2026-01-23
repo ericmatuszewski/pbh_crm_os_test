@@ -217,7 +217,7 @@ export default function DealsPage() {
           expectedCloseDate: formData.expectedCloseDate || null,
           contactId: formData.contactId || null,
           companyId: formData.companyId || null,
-          ownerId: "user-1", // TODO: Get from auth
+          // ownerId defaults to current user in API if not provided
         }),
       });
 

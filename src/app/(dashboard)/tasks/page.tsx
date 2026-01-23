@@ -161,7 +161,7 @@ export default function TasksPage() {
         body: JSON.stringify({
           ...formData,
           dueDate: formData.dueDate || null,
-          assigneeId: "user-1", // TODO: Get from auth
+          // assigneeId defaults to current user in API if not provided
         }),
       });
 

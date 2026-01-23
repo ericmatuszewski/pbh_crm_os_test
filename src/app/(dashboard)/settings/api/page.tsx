@@ -82,8 +82,6 @@ interface IntegrationData {
   createdAt: string;
 }
 
-const MOCK_USER_ID = "user-1";
-
 const AVAILABLE_SCOPES = [
   { value: "read", label: "Read", description: "Read-only access to data" },
   { value: "write", label: "Write", description: "Create and update records" },
@@ -119,6 +117,9 @@ const INTEGRATION_PROVIDERS = [
 ];
 
 export default function ApiSettingsPage() {
+  // Current user
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
   // API Keys state
   const [apiKeys, setApiKeys] = useState<ApiKeyData[]>([]);
   const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
@@ -152,14 +153,32 @@ export default function ApiSettingsPage() {
 
   const [loading, setLoading] = useState(true);
 
+  // Fetch current user on mount
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await fetch("/api/auth/me");
+        const data = await response.json();
+        if (data.success && data.data?.user?.id) {
+          setCurrentUserId(data.data.user.id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch current user:", error);
+      }
+    };
+    fetchCurrentUser();
+  }, []);
+
   // Fetch all data
   const fetchData = useCallback(async () => {
+    if (!currentUserId) return;
+
     try {
       setLoading(true);
       const [apiKeysRes, webhooksRes, integrationsRes] = await Promise.all([
-        fetch(`/api/api-keys?userId=${MOCK_USER_ID}`),
-        fetch(`/api/webhooks?userId=${MOCK_USER_ID}`),
-        fetch(`/api/integrations?userId=${MOCK_USER_ID}`),
+        fetch(`/api/api-keys?userId=${currentUserId}`),
+        fetch(`/api/webhooks?userId=${currentUserId}`),
+        fetch(`/api/integrations?userId=${currentUserId}`),
       ]);
 
       const [apiKeysData, webhooksData, integrationsData] = await Promise.all([
@@ -176,7 +195,7 @@ export default function ApiSettingsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
     fetchData();
@@ -190,7 +209,7 @@ export default function ApiSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...apiKeyForm,
-          userId: MOCK_USER_ID,
+          userId: currentUserId,
         }),
       });
       const data = await res.json();
@@ -229,7 +248,7 @@ export default function ApiSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...webhookForm,
-          userId: MOCK_USER_ID,
+          userId: currentUserId,
         }),
       });
       const data = await res.json();
@@ -287,7 +306,7 @@ export default function ApiSettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...integrationForm,
-          userId: MOCK_USER_ID,
+          userId: currentUserId,
         }),
       });
       const data = await res.json();
