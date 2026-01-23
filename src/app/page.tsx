@@ -15,8 +15,15 @@ import {
   AlertCircle,
   X,
   RefreshCw,
+  Phone,
+  Mail,
+  Calendar,
+  FileText,
+  CheckSquare,
+  ArrowRight,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
 
 interface DashboardStats {
   totalRevenue: number;
@@ -35,6 +42,26 @@ interface DashboardStats {
   }[];
 }
 
+interface Activity {
+  id: string;
+  type: string;
+  title: string;
+  description?: string;
+  createdAt: string;
+  user?: { name: string };
+  contact?: { firstName: string; lastName: string };
+  deal?: { title: string };
+}
+
+interface Task {
+  id: string;
+  title: string;
+  dueDate?: string;
+  priority: string;
+  status: string;
+  assignee?: { name: string };
+}
+
 const defaultStats: DashboardStats = {
   totalRevenue: 0,
   activeDeals: 0,
@@ -48,10 +75,21 @@ const defaultStats: DashboardStats = {
   pipeline: [],
 };
 
+const activityIcons: Record<string, typeof Phone> = {
+  CALL: Phone,
+  EMAIL: Mail,
+  MEETING: Calendar,
+  NOTE: FileText,
+  TASK: CheckSquare,
+  DEAL_UPDATE: ArrowRight,
+};
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats>(defaultStats);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showDemoBanner, setShowDemoBanner] = useState(true);
+  const [showDemoBanner, setShowDemoBanner] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
 
   useEffect(() => {
@@ -61,15 +99,22 @@ export default function DashboardPage() {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/dashboard/stats");
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.data) {
-          setStats(data.data);
+      // Fetch all data in parallel
+      const [statsRes, activitiesRes, tasksRes] = await Promise.all([
+        fetch("/api/dashboard/stats"),
+        fetch("/api/activities?limit=5"),
+        fetch("/api/tasks?limit=5&status=TODO"),
+      ]);
+
+      // Handle stats
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        if (statsData.success && statsData.data) {
+          setStats(statsData.data);
           setIsDemo(false);
         } else {
-          // No real data, show demo values
           setIsDemo(true);
+          setShowDemoBanner(true);
           setStats({
             totalRevenue: 284500,
             activeDeals: 24,
@@ -88,47 +133,27 @@ export default function DashboardPage() {
             ],
           });
         }
-      } else {
-        // API error, show demo values
-        setIsDemo(true);
-        setStats({
-          totalRevenue: 284500,
-          activeDeals: 24,
-          dealsClosingThisMonth: 8,
-          newContacts: 142,
-          conversionRate: 24.8,
-          revenueTrend: 12.5,
-          dealsTrend: 8.2,
-          contactsTrend: 5.1,
-          conversionTrend: 2.7,
-          pipeline: [
-            { stage: "Qualification", count: 8, value: 45000 },
-            { stage: "Discovery", count: 6, value: 78000 },
-            { stage: "Proposal", count: 5, value: 120000 },
-            { stage: "Negotiation", count: 3, value: 95000 },
-          ],
-        });
       }
-    } catch {
-      // Network error, show demo values
+
+      // Handle activities
+      if (activitiesRes.ok) {
+        const activitiesData = await activitiesRes.json();
+        if (activitiesData.success && activitiesData.data) {
+          setActivities(activitiesData.data);
+        }
+      }
+
+      // Handle tasks
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json();
+        if (tasksData.success && tasksData.data) {
+          setTasks(tasksData.data);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
       setIsDemo(true);
-      setStats({
-        totalRevenue: 284500,
-        activeDeals: 24,
-        dealsClosingThisMonth: 8,
-        newContacts: 142,
-        conversionRate: 24.8,
-        revenueTrend: 12.5,
-        dealsTrend: 8.2,
-        contactsTrend: 5.1,
-        conversionTrend: 2.7,
-        pipeline: [
-          { stage: "Qualification", count: 8, value: 45000 },
-          { stage: "Discovery", count: 6, value: 78000 },
-          { stage: "Proposal", count: 5, value: 120000 },
-          { stage: "Negotiation", count: 3, value: 95000 },
-        ],
-      });
+      setShowDemoBanner(true);
     } finally {
       setLoading(false);
     }
@@ -140,6 +165,35 @@ export default function DashboardPage() {
     setShowDemoBanner(false);
   };
 
+  const formatActivityTime = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch {
+      return "recently";
+    }
+  };
+
+  const formatDueDate = (dateString?: string) => {
+    if (!dateString) return "No due date";
+    try {
+      const date = new Date(dateString);
+      const today = new Date();
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      if (date.toDateString() === today.toDateString()) return "Today";
+      if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+      return date.toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const getActivityIcon = (type: string) => {
+    const Icon = activityIcons[type] || FileText;
+    return <Icon className="w-4 h-4" />;
+  };
+
   return (
     <div className="flex h-screen bg-slate-50">
       <Sidebar />
@@ -148,9 +202,11 @@ export default function DashboardPage() {
           title="Dashboard"
           subtitle="Welcome back! Here's what's happening with your sales."
           actions={
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              New Deal
+            <Button asChild>
+              <a href="/deals">
+                <Plus className="w-4 h-4 mr-2" />
+                New Deal
+              </a>
             </Button>
           }
         />
@@ -234,9 +290,9 @@ export default function DashboardPage() {
           </div>
 
           {/* Pipeline Preview */}
-          <div className="bg-white rounded-lg border p-6 mb-6">
+          <div className="bg-white rounded-lg border border-slate-200 p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Sales Pipeline</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Sales Pipeline</h2>
               <Button variant="outline" size="sm" asChild>
                 <a href="/deals">View All</a>
               </Button>
@@ -248,14 +304,14 @@ export default function DashboardPage() {
                     key={item.stage}
                     className="bg-slate-50 rounded-lg p-4 text-center"
                   >
-                    <p className="text-sm text-muted-foreground">{item.stage}</p>
-                    <p className="text-2xl font-bold mt-1">{item.count}</p>
-                    <p className="text-sm text-primary font-medium">{formatCurrency(item.value)}</p>
+                    <p className="text-sm text-slate-600">{item.stage}</p>
+                    <p className="text-2xl font-bold text-slate-900 mt-1">{item.count}</p>
+                    <p className="text-sm text-blue-600 font-medium">{formatCurrency(item.value)}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-8 text-slate-500">
                 <Target className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p>No deals in pipeline yet</p>
                 <Button variant="link" className="mt-2" asChild>
@@ -267,66 +323,85 @@ export default function DashboardPage() {
 
           {/* Recent Activity & Tasks */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg border p-6">
-              <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
-              {isDemo ? (
+            <div className="bg-white rounded-lg border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-slate-900">Recent Activity</h2>
+                <Button variant="ghost" size="sm" asChild>
+                  <a href="/activities">View All</a>
+                </Button>
+              </div>
+              {activities.length > 0 ? (
                 <div className="space-y-4">
-                  {[
-                    { action: "Deal updated", target: "Acme Corp - Enterprise", time: "2 hours ago" },
-                    { action: "New contact added", target: "John Smith", time: "4 hours ago" },
-                    { action: "Meeting scheduled", target: "TechStart Inc", time: "5 hours ago" },
-                    { action: "Deal won", target: "GlobalTech - Pro Plan", time: "1 day ago" },
-                  ].map((activity, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm">
-                      <div className="w-2 h-2 rounded-full bg-primary" />
-                      <div className="flex-1">
-                        <span className="text-muted-foreground">{activity.action}: </span>
-                        <span className="font-medium">{activity.target}</span>
+                  {activities.map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-3 text-sm">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                        {getActivityIcon(activity.type)}
                       </div>
-                      <span className="text-muted-foreground text-xs">{activity.time}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-slate-900 truncate">{activity.title}</p>
+                        {activity.contact && (
+                          <p className="text-slate-500 text-xs">
+                            {activity.contact.firstName} {activity.contact.lastName}
+                          </p>
+                        )}
+                        {activity.deal && (
+                          <p className="text-slate-500 text-xs">{activity.deal.title}</p>
+                        )}
+                      </div>
+                      <span className="text-slate-400 text-xs whitespace-nowrap">
+                        {formatActivityTime(activity.createdAt)}
+                      </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-8 text-slate-500">
+                  <FileText className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p>No recent activity</p>
                   <p className="text-sm mt-1">Activity will appear here as you work</p>
                 </div>
               )}
             </div>
 
-            <div className="bg-white rounded-lg border p-6">
-              <h2 className="text-lg font-semibold mb-4">Upcoming Tasks</h2>
-              {isDemo ? (
+            <div className="bg-white rounded-lg border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-slate-900">Upcoming Tasks</h2>
+                <Button variant="ghost" size="sm" asChild>
+                  <a href="/tasks">View All</a>
+                </Button>
+              </div>
+              {tasks.length > 0 ? (
                 <div className="space-y-3">
-                  {[
-                    { task: "Follow up with Acme Corp", due: "Today", priority: "high" },
-                    { task: "Prepare proposal for TechStart", due: "Tomorrow", priority: "medium" },
-                    { task: "Schedule demo with GlobalTech", due: "Jan 22", priority: "medium" },
-                    { task: "Review contract terms", due: "Jan 23", priority: "low" },
-                  ].map((task, i) => (
-                    <div key={i} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50">
-                      <input type="checkbox" className="rounded border-slate-300" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{task.task}</p>
-                        <p className="text-xs text-muted-foreground">Due: {task.due}</p>
+                  {tasks.map((task) => (
+                    <div key={task.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors">
+                      <input
+                        type="checkbox"
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        onChange={() => {
+                          // Could implement task completion here
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{task.title}</p>
+                        <p className="text-xs text-slate-500">Due: {formatDueDate(task.dueDate)}</p>
                       </div>
                       <span
-                        className={`text-xs px-2 py-1 rounded-full ${
-                          task.priority === "high"
+                        className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          task.priority === "HIGH" || task.priority === "URGENT"
                             ? "bg-red-100 text-red-700"
-                            : task.priority === "medium"
+                            : task.priority === "MEDIUM"
                             ? "bg-yellow-100 text-yellow-700"
                             : "bg-slate-100 text-slate-600"
                         }`}
                       >
-                        {task.priority}
+                        {task.priority.toLowerCase()}
                       </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-muted-foreground">
+                <div className="text-center py-8 text-slate-500">
+                  <CheckSquare className="w-10 h-10 mx-auto mb-3 opacity-30" />
                   <p>No upcoming tasks</p>
                   <Button variant="link" className="mt-2" asChild>
                     <a href="/tasks">Create a task</a>
