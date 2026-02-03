@@ -612,6 +612,16 @@ model Task {
   relatedType String?
   relatedId   String?
 
+  // Recurring task settings
+  isRecurring       Boolean  @default(false)
+  recurrencePattern String?  // "daily", "weekly", "monthly", "custom"
+  recurrenceInterval Int?    // e.g., every 2 weeks
+  recurrenceEndDate DateTime?
+  parentTaskId      String?  // Links to parent recurring task
+
+  // Task dependencies
+  dependsOnId       String?  // Task that must complete before this one
+
   // Multi-business support
   businessId  String?
   business    Business?  @relation(fields: [businessId], references: [id])
@@ -623,6 +633,8 @@ model Task {
   @@index([status])
   @@index([dueDate])
   @@index([businessId])
+  @@index([parentTaskId])
+  @@index([dependsOnId])
 }
 
 model Activity {

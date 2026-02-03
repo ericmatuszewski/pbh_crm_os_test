@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, Suspense, useRef } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DealTable, DealKanban, PipelineAnalytics } from "@/components/deals";
 import { StageConfig } from "@/components/deals/DealKanban";
-import { EmptyState } from "@/components/shared";
-import { Plus, Target, Search, LayoutGrid, List, BarChart3, Settings2 } from "lucide-react";
-import { Deal, DealStage, Contact, Company, Pipeline } from "@/types";
+import { EmptyState, LoadingState } from "@/components/shared";
+import { Plus, Target, Search, LayoutGrid, List, BarChart3, Settings2, Loader2 } from "lucide-react";
+import { Deal, DealStage, Pipeline } from "@/types";
 import Link from "next/link";
+import { toast } from "sonner";
+import { useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useContacts, useCompanies, usePipelines, useUrlFilters } from "@/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 
 const stageLabels: Record<DealStage, string> = {
   QUALIFICATION: "Qualification",
@@ -45,16 +48,17 @@ const stageProbabilities: Record<DealStage, number> = {
   CLOSED_LOST: 0,
 };
 
-export default function DealsPage() {
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+function DealsPageContent() {
+  // URL-based persistent filters
+  const { values: filters, setValues: setFilters } = useUrlFilters({
+    search: "",
+    stage: "",
+    view: "kanban",
+  });
+
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [stageFilter, setStageFilter] = useState("");
-  const [viewMode, setViewMode] = useState<"table" | "kanban" | "analytics">("kanban");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const viewMode = filters.view as "table" | "kanban" | "analytics";
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [formData, setFormData] = useState({
@@ -70,43 +74,31 @@ export default function DealsPage() {
     stageId: "",
   });
 
+  const queryClient = useQueryClient();
+
+  // React Query hooks
+  const { data: deals = [], isLoading: dealsLoading } = useDeals({ search: filters.search, stage: filters.stage });
+  const { data: contacts = [] } = useContacts();
+  const { data: companies = [] } = useCompanies();
+  const { data: pipelines = [] } = usePipelines();
+
+  const createMutation = useCreateDeal();
+  const updateMutation = useUpdateDeal();
+  const deleteMutation = useDeleteDeal();
+
+  const isLoading = dealsLoading;
+
+  // Auto-select default pipeline when pipelines load
   useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      const [dealsRes, contactsRes, companiesRes, pipelinesRes] = await Promise.all([
-        fetch("/api/deals"),
-        fetch("/api/contacts"),
-        fetch("/api/companies"),
-        fetch("/api/pipelines"),
-      ]);
-
-      const dealsData = await dealsRes.json();
-      const contactsData = await contactsRes.json();
-      const companiesData = await companiesRes.json();
-      const pipelinesData = await pipelinesRes.json();
-
-      if (dealsData.success) setDeals(dealsData.data);
-      if (contactsData.success) setContacts(contactsData.data);
-      if (companiesData.success) setCompanies(companiesData.data);
-      if (pipelinesData.success) {
-        setPipelines(pipelinesData.data);
-        // Select default pipeline
-        const defaultPipeline = pipelinesData.data.find((p: Pipeline) => p.isDefault);
-        if (defaultPipeline) {
-          setSelectedPipelineId(defaultPipeline.id);
-        } else if (pipelinesData.data.length > 0) {
-          setSelectedPipelineId(pipelinesData.data[0].id);
-        }
+    if (pipelines.length > 0 && !selectedPipelineId) {
+      const defaultPipeline = pipelines.find((p) => p.isDefault);
+      if (defaultPipeline) {
+        setSelectedPipelineId(defaultPipeline.id);
+      } else {
+        setSelectedPipelineId(pipelines[0].id);
       }
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [pipelines, selectedPipelineId]);
 
   // Get the selected pipeline and its stages
   const selectedPipeline = pipelines.find(p => p.id === selectedPipelineId);
@@ -121,13 +113,13 @@ export default function DealsPage() {
 
   const filteredDeals = deals.filter((deal) => {
     const matchesSearch =
-      !search ||
-      deal.title.toLowerCase().includes(search.toLowerCase()) ||
-      deal.contact?.firstName?.toLowerCase().includes(search.toLowerCase()) ||
-      deal.company?.name?.toLowerCase().includes(search.toLowerCase());
+      !filters.search ||
+      deal.title.toLowerCase().includes(filters.search.toLowerCase()) ||
+      deal.contact?.firstName?.toLowerCase().includes(filters.search.toLowerCase()) ||
+      deal.company?.name?.toLowerCase().includes(filters.search.toLowerCase());
 
     const matchesStage =
-      !stageFilter || stageFilter === "all" || deal.stage === stageFilter || deal.stageId === stageFilter;
+      !filters.stage || filters.stage === "all" || deal.stage === filters.stage || deal.stageId === filters.stage;
 
     // Filter by pipeline if one is selected
     const matchesPipeline =
@@ -197,36 +189,32 @@ export default function DealsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const url = editingDeal ? `/api/deals/${editingDeal.id}` : "/api/deals";
-      const method = editingDeal ? "PUT" : "POST";
-
       // Determine if we're using a pipeline stage or the legacy DealStage enum
       const isUsingPipelineStage = formData.stageId && pipelineStages.some(s => s.id === formData.stageId);
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: formData.title,
-          value: parseFloat(formData.value),
-          currency: formData.currency,
-          stage: isUsingPipelineStage ? "QUALIFICATION" : formData.stage, // Fallback for legacy field
-          stageId: isUsingPipelineStage ? formData.stageId : null,
-          pipelineId: formData.pipelineId || null,
-          probability: parseInt(formData.probability),
-          expectedCloseDate: formData.expectedCloseDate || null,
-          contactId: formData.contactId || null,
-          companyId: formData.companyId || null,
-          // ownerId defaults to current user in API if not provided
-        }),
-      });
+      const dealData = {
+        title: formData.title,
+        value: parseFloat(formData.value),
+        currency: formData.currency,
+        stage: isUsingPipelineStage ? "QUALIFICATION" : formData.stage, // Fallback for legacy field
+        stageId: isUsingPipelineStage ? formData.stageId : undefined,
+        pipelineId: formData.pipelineId || undefined,
+        probability: parseInt(formData.probability),
+        expectedCloseDate: formData.expectedCloseDate || undefined,
+        contactId: formData.contactId || undefined,
+        companyId: formData.companyId || undefined,
+      };
 
-      if (res.ok) {
-        fetchData();
-        setIsFormOpen(false);
+      if (editingDeal) {
+        await updateMutation.mutateAsync({ id: editingDeal.id, data: dealData });
+        toast.success("Deal updated successfully");
+      } else {
+        await createMutation.mutateAsync(dealData as Parameters<typeof createMutation.mutateAsync>[0]);
+        toast.success("Deal created successfully");
       }
-    } catch (error) {
-      console.error("Failed to save deal:", error);
+      setIsFormOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save deal");
     }
   };
 
@@ -236,12 +224,10 @@ export default function DealsPage() {
     }
 
     try {
-      const res = await fetch(`/api/deals/${deal.id}`, { method: "DELETE" });
-      if (res.ok) {
-        fetchData();
-      }
-    } catch (error) {
-      console.error("Failed to delete deal:", error);
+      await deleteMutation.mutateAsync(deal.id);
+      toast.success("Deal deleted successfully");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete deal");
     }
   };
 
@@ -250,20 +236,15 @@ export default function DealsPage() {
       // Check if newStage is a pipeline stage ID or a DealStage enum value
       const isStageId = !Object.values(DealStage).includes(newStage as DealStage);
 
-      const res = await fetch(`/api/deals/${dealId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await updateMutation.mutateAsync({
+        id: dealId,
+        data: {
           ...(isStageId ? { stageId: newStage } : { stage: newStage }),
           probability,
-        }),
+        },
       });
-
-      if (res.ok) {
-        fetchData();
-      }
-    } catch (error) {
-      console.error("Failed to update deal stage:", error);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update deal stage");
     }
   };
 
@@ -298,9 +279,10 @@ export default function DealsPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
+                    ref={searchInputRef}
                     placeholder="Search deals..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    value={filters.search}
+                    onChange={(e) => setFilters({ search: e.target.value })}
                     className="pl-10"
                   />
                 </div>
@@ -318,7 +300,7 @@ export default function DealsPage() {
                     </SelectContent>
                   </Select>
                 )}
-                <Select value={stageFilter || "all"} onValueChange={setStageFilter}>
+                <Select value={filters.stage || "all"} onValueChange={(value) => setFilters({ stage: value === "all" ? "" : value })}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="All stages" />
                   </SelectTrigger>
@@ -342,7 +324,7 @@ export default function DealsPage() {
                   <Button
                     variant={viewMode === "kanban" ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => setViewMode("kanban")}
+                    onClick={() => setFilters({ view: "kanban" })}
                     title="Kanban view"
                   >
                     <LayoutGrid className="w-4 h-4" />
@@ -350,7 +332,7 @@ export default function DealsPage() {
                   <Button
                     variant={viewMode === "table" ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => setViewMode("table")}
+                    onClick={() => setFilters({ view: "table" })}
                     title="Table view"
                   >
                     <List className="w-4 h-4" />
@@ -358,7 +340,7 @@ export default function DealsPage() {
                   <Button
                     variant={viewMode === "analytics" ? "secondary" : "ghost"}
                     size="sm"
-                    onClick={() => setViewMode("analytics")}
+                    onClick={() => setFilters({ view: "analytics" })}
                     title="Analytics"
                   >
                     <BarChart3 className="w-4 h-4" />
@@ -368,9 +350,9 @@ export default function DealsPage() {
             </div>
 
             {/* Content */}
-            {loading ? (
-              <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
-                Loading...
+            {isLoading ? (
+              <div className="bg-white rounded-lg border p-8">
+                <LoadingState message="Loading deals..." />
               </div>
             ) : viewMode === "analytics" ? (
               <PipelineAnalytics deals={deals} />
@@ -396,12 +378,12 @@ export default function DealsPage() {
                   icon={<Target className="h-12 w-12" />}
                   title="No deals found"
                   description={
-                    search || stageFilter
+                    filters.search || filters.stage
                       ? "Try adjusting your filters to find what you're looking for."
                       : "Get started by adding your first deal."
                   }
                   action={
-                    !search && !stageFilter
+                    !filters.search && !filters.stage
                       ? { label: "Add Deal", onClick: () => handleOpenForm() }
                       : undefined
                   }
@@ -576,7 +558,10 @@ export default function DealsPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                {(createMutation.isPending || updateMutation.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 {editingDeal ? "Update" : "Create"} Deal
               </Button>
             </div>
@@ -584,5 +569,25 @@ export default function DealsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function DealsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen bg-slate-50">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header title="Deals" subtitle="Loading..." />
+          <main className="flex-1 overflow-y-auto p-6">
+            <div className="bg-white rounded-lg border p-8">
+              <LoadingState message="Loading deals..." />
+            </div>
+          </main>
+        </div>
+      </div>
+    }>
+      <DealsPageContent />
+    </Suspense>
   );
 }

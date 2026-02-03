@@ -13,25 +13,18 @@ interface SearchResult {
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const query = searchParams.get("q");
+    const query = searchParams.get("q") || ""; // Allow empty query
     const entity = searchParams.get("entity");
     const userId = searchParams.get("userId");
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    if (!query || query.length < 2) {
-      return NextResponse.json(
-        { success: false, error: { code: "VALIDATION_ERROR", message: "Query must be at least 2 characters" } },
-        { status: 400 }
-      );
-    }
-
     const results: SearchResult[] = [];
-    const searchTerm = `%${query.toLowerCase()}%`;
+    const hasQuery = query.length > 0;
 
     // Search contacts
     if (!entity || entity === "contacts") {
       const contacts = await prisma.contact.findMany({
-        where: {
+        where: hasQuery ? {
           OR: [
             { firstName: { contains: query, mode: "insensitive" } },
             { lastName: { contains: query, mode: "insensitive" } },
@@ -39,7 +32,7 @@ export async function GET(request: NextRequest) {
             { phone: { contains: query, mode: "insensitive" } },
             { title: { contains: query, mode: "insensitive" } },
           ],
-        },
+        } : undefined,
         select: {
           id: true,
           firstName: true,
@@ -47,6 +40,7 @@ export async function GET(request: NextRequest) {
           email: true,
           company: { select: { name: true } },
         },
+        orderBy: { createdAt: "desc" },
         take: limit,
       });
 
@@ -64,19 +58,20 @@ export async function GET(request: NextRequest) {
     // Search companies
     if (!entity || entity === "companies") {
       const companies = await prisma.company.findMany({
-        where: {
+        where: hasQuery ? {
           OR: [
             { name: { contains: query, mode: "insensitive" } },
             { website: { contains: query, mode: "insensitive" } },
             { industry: { contains: query, mode: "insensitive" } },
           ],
-        },
+        } : undefined,
         select: {
           id: true,
           name: true,
           industry: true,
           website: true,
         },
+        orderBy: { createdAt: "desc" },
         take: limit,
       });
 
@@ -94,9 +89,9 @@ export async function GET(request: NextRequest) {
     // Search deals
     if (!entity || entity === "deals") {
       const deals = await prisma.deal.findMany({
-        where: {
+        where: hasQuery ? {
           OR: [{ title: { contains: query, mode: "insensitive" } }],
-        },
+        } : undefined,
         select: {
           id: true,
           title: true,
@@ -104,6 +99,7 @@ export async function GET(request: NextRequest) {
           stage: true,
           company: { select: { name: true } },
         },
+        orderBy: { createdAt: "desc" },
         take: limit,
       });
 
@@ -121,12 +117,12 @@ export async function GET(request: NextRequest) {
     // Search quotes
     if (!entity || entity === "quotes") {
       const quotes = await prisma.quote.findMany({
-        where: {
+        where: hasQuery ? {
           OR: [
             { quoteNumber: { contains: query, mode: "insensitive" } },
             { title: { contains: query, mode: "insensitive" } },
           ],
-        },
+        } : undefined,
         select: {
           id: true,
           quoteNumber: true,
@@ -134,6 +130,7 @@ export async function GET(request: NextRequest) {
           status: true,
           total: true,
         },
+        orderBy: { createdAt: "desc" },
         take: limit,
       });
 
@@ -151,18 +148,19 @@ export async function GET(request: NextRequest) {
     // Search tasks
     if (!entity || entity === "tasks") {
       const tasks = await prisma.task.findMany({
-        where: {
+        where: hasQuery ? {
           OR: [
             { title: { contains: query, mode: "insensitive" } },
             { description: { contains: query, mode: "insensitive" } },
           ],
-        },
+        } : undefined,
         select: {
           id: true,
           title: true,
           status: true,
           dueDate: true,
         },
+        orderBy: { createdAt: "desc" },
         take: limit,
       });
 
@@ -180,19 +178,20 @@ export async function GET(request: NextRequest) {
     // Search products
     if (!entity || entity === "products") {
       const products = await prisma.product.findMany({
-        where: {
+        where: hasQuery ? {
           OR: [
             { name: { contains: query, mode: "insensitive" } },
             { sku: { contains: query, mode: "insensitive" } },
             { description: { contains: query, mode: "insensitive" } },
           ],
-        },
+        } : undefined,
         select: {
           id: true,
           name: true,
           sku: true,
           basePrice: true,
         },
+        orderBy: { createdAt: "desc" },
         take: limit,
       });
 
@@ -207,8 +206,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Log search history if userId provided
-    if (userId) {
+    // Log search history if userId provided and there's a query
+    if (userId && hasQuery) {
       await prisma.searchHistory.create({
         data: {
           userId,
@@ -232,10 +231,13 @@ export async function GET(request: NextRequest) {
     results.sort((a, b) => {
       const priorityDiff = entityPriority[a.entity] - entityPriority[b.entity];
       if (priorityDiff !== 0) return priorityDiff;
-      // Secondary sort by title match
-      const aMatch = a.title.toLowerCase().includes(query.toLowerCase()) ? 0 : 1;
-      const bMatch = b.title.toLowerCase().includes(query.toLowerCase()) ? 0 : 1;
-      return aMatch - bMatch;
+      // Secondary sort by title match (only if query exists)
+      if (hasQuery) {
+        const aMatch = a.title.toLowerCase().includes(query.toLowerCase()) ? 0 : 1;
+        const bMatch = b.title.toLowerCase().includes(query.toLowerCase()) ? 0 : 1;
+        return aMatch - bMatch;
+      }
+      return 0;
     });
 
     return NextResponse.json({

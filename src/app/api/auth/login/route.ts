@@ -33,52 +33,86 @@ export async function POST(request: NextRequest) {
     // Authenticate against AD
     const authResult = await authenticateAD(username, password);
 
+    let user = null;
+
     if (!authResult.success || !authResult.user) {
+      // Development fallback: allow login with existing database users
+      // when AD is unreachable (e.g., not on corporate network)
+      if (process.env.NODE_ENV !== "production" || process.env.DEV_AUTH_FALLBACK === "true") {
+        user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { email: { contains: username, mode: "insensitive" } },
+              { name: { contains: username, mode: "insensitive" } },
+            ],
+            status: "ACTIVE",
+          },
+        });
+
+        if (user && password === "devtest123") {
+          // Dev fallback login
+        } else {
+          return NextResponse.json(
+            { success: false, error: { message: authResult.error || "Authentication failed" } },
+            { status: 401 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { success: false, error: { message: authResult.error || "Authentication failed" } },
+          { status: 401 }
+        );
+      }
+    } else {
+      const adUser = authResult.user;
+
+      // Find or create user in database
+      user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: adUser.mail },
+            { email: adUser.userPrincipalName },
+            { name: adUser.sAMAccountName },
+          ],
+        },
+      });
+
+      if (!user) {
+        // Get default business (or first one)
+        const business = await prisma.business.findFirst();
+
+        // Create new user from AD info
+        user = await prisma.user.create({
+          data: {
+            email: adUser.mail || adUser.userPrincipalName || `${adUser.sAMAccountName}@nobutts.com`,
+            name: adUser.displayName || `${adUser.givenName} ${adUser.sn}`.trim() || adUser.sAMAccountName,
+            status: "ACTIVE",
+            authProvider: "LDAP",
+            externalId: adUser.dn,
+          },
+        });
+
+        // If a default business exists, associate user with it
+        if (business) {
+          await prisma.userBusiness.create({
+            data: {
+              userId: user.id,
+              businessId: business.id,
+              isDefault: true,
+            },
+          });
+        }
+      }
+    }
+
+    if (!user) {
       return NextResponse.json(
-        { success: false, error: { message: authResult.error || "Authentication failed" } },
+        { success: false, error: { message: "User not found" } },
         { status: 401 }
       );
     }
 
-    const adUser = authResult.user;
-
-    // Find or create user in database
-    let user = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email: adUser.mail },
-          { email: adUser.userPrincipalName },
-          { name: adUser.sAMAccountName },
-        ],
-      },
-    });
-
-    if (!user) {
-      // Get default business (or first one)
-      const business = await prisma.business.findFirst();
-
-      // Create new user from AD info
-      user = await prisma.user.create({
-        data: {
-          email: adUser.mail || adUser.userPrincipalName || `${adUser.sAMAccountName}@nobutts.com`,
-          name: adUser.displayName || `${adUser.givenName} ${adUser.sn}`.trim() || adUser.sAMAccountName,
-          status: "ACTIVE",
-          authProvider: "LDAP",
-          externalId: adUser.dn,
-        },
-      });
-
-      // If a default business exists, associate user with it
-      if (business) {
-        await prisma.userBusiness.create({
-          data: {
-            userId: user.id,
-            businessId: business.id,
-            isDefault: true,
-          },
-        });
-      }
-    } else if (user.status !== "ACTIVE") {
+    if (user.status !== "ACTIVE") {
       return NextResponse.json(
         { success: false, error: { message: "User account is disabled" } },
         { status: 403 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth/get-current-user";
+import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +17,13 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "20");
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    const where: any = {};
+    const where: Prisma.ActivityWhereInput = {};
 
     if (contactId) where.contactId = contactId;
     if (dealId) where.dealId = dealId;
     if (userId) where.userId = userId;
     if (businessId) where.businessId = businessId;
-    if (type) where.type = type;
+    if (type) where.type = type as Prisma.EnumActivityTypeFilter<"Activity">;
 
     const [activities, total] = await Promise.all([
       prisma.activity.findMany({

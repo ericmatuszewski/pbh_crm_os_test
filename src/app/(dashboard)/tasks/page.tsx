@@ -39,6 +39,8 @@ import {
   Trash2,
   Calendar,
   AlertCircle,
+  Repeat,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -91,6 +93,10 @@ export default function TasksPage() {
     dueDate: "",
     priority: "MEDIUM" as Priority,
     status: "TODO" as TaskStatus,
+    isRecurring: false,
+    recurrencePattern: "" as string,
+    recurrenceInterval: "1",
+    recurrenceEndDate: "",
   });
 
   useEffect(() => {
@@ -135,6 +141,12 @@ export default function TasksPage() {
           : "",
         priority: task.priority,
         status: task.status,
+        isRecurring: (task as Task & { isRecurring?: boolean }).isRecurring || false,
+        recurrencePattern: (task as Task & { recurrencePattern?: string }).recurrencePattern || "",
+        recurrenceInterval: String((task as Task & { recurrenceInterval?: number }).recurrenceInterval || 1),
+        recurrenceEndDate: (task as Task & { recurrenceEndDate?: string }).recurrenceEndDate
+          ? new Date((task as Task & { recurrenceEndDate: string }).recurrenceEndDate).toISOString().split("T")[0]
+          : "",
       });
     } else {
       setEditingTask(null);
@@ -144,6 +156,10 @@ export default function TasksPage() {
         dueDate: "",
         priority: "MEDIUM",
         status: "TODO",
+        isRecurring: false,
+        recurrencePattern: "",
+        recurrenceInterval: "1",
+        recurrenceEndDate: "",
       });
     }
     setIsFormOpen(true);
@@ -159,9 +175,15 @@ export default function TasksPage() {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
+          title: formData.title,
+          description: formData.description,
           dueDate: formData.dueDate || null,
-          // assigneeId defaults to current user in API if not provided
+          priority: formData.priority,
+          status: formData.status,
+          isRecurring: formData.isRecurring,
+          recurrencePattern: formData.isRecurring ? (formData.recurrencePattern || "daily") : null,
+          recurrenceInterval: formData.isRecurring ? parseInt(formData.recurrenceInterval) || 1 : null,
+          recurrenceEndDate: formData.isRecurring && formData.recurrenceEndDate ? formData.recurrenceEndDate : null,
         }),
       });
 
@@ -483,6 +505,72 @@ export default function TasksPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Recurrence Settings */}
+            <div className="space-y-3 pt-2 border-t">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="isRecurring"
+                  checked={formData.isRecurring}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, isRecurring: !!checked })
+                  }
+                />
+                <Label htmlFor="isRecurring" className="flex items-center gap-1.5 cursor-pointer">
+                  <Repeat className="w-4 h-4" />
+                  Recurring Task
+                </Label>
+              </div>
+
+              {formData.isRecurring && (
+                <div className="grid grid-cols-2 gap-4 pl-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="recurrencePattern">Frequency</Label>
+                    <Select
+                      value={formData.recurrencePattern || "daily"}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, recurrencePattern: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="recurrenceInterval">
+                      Every N {formData.recurrencePattern === "daily" ? "days" : formData.recurrencePattern === "weekly" ? "weeks" : "months"}
+                    </Label>
+                    <Input
+                      id="recurrenceInterval"
+                      type="number"
+                      min="1"
+                      max="52"
+                      value={formData.recurrenceInterval}
+                      onChange={(e) =>
+                        setFormData({ ...formData, recurrenceInterval: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="recurrenceEndDate">End Date (optional)</Label>
+                    <Input
+                      id="recurrenceEndDate"
+                      type="date"
+                      value={formData.recurrenceEndDate}
+                      onChange={(e) =>
+                        setFormData({ ...formData, recurrenceEndDate: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 pt-4">

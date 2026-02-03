@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Bell, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { BusinessSwitcher } from "./BusinessSwitcher";
 import Link from "next/link";
 
@@ -48,14 +47,26 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
         {/* Business Switcher */}
         <BusinessSwitcher />
 
-        {/* Search */}
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search..."
-            className="pl-9 bg-slate-50 border-slate-200"
-          />
-        </div>
+        {/* Search - Opens Command Palette */}
+        <button
+          onClick={() => {
+            // Trigger Cmd+K programmatically
+            const event = new KeyboardEvent("keydown", {
+              key: "k",
+              metaKey: true,
+              ctrlKey: true,
+              bubbles: true,
+            });
+            document.dispatchEvent(event);
+          }}
+          className="relative w-64 flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors"
+        >
+          <Search className="w-4 h-4" />
+          <span className="flex-1 text-left">Search...</span>
+          <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </button>
 
         {/* Notifications */}
         <Link href="/notifications">

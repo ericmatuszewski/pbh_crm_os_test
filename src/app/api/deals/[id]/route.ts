@@ -10,9 +10,28 @@ export async function GET(
     const deal = await prisma.deal.findUnique({
       where: { id: params.id },
       include: {
-        contact: true,
-        company: true,
+        contact: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            title: true,
+            status: true,
+          },
+        },
+        company: {
+          select: {
+            id: true,
+            name: true,
+            website: true,
+            industry: true,
+          },
+        },
         owner: { select: { id: true, name: true, email: true, image: true } },
+        pipeline: { select: { id: true, name: true } },
+        pipelineStage: { select: { id: true, name: true, probability: true, color: true } },
         activities: {
           include: { user: { select: { id: true, name: true } } },
           orderBy: { createdAt: "desc" },
@@ -21,6 +40,17 @@ export async function GET(
         notes: {
           orderBy: { createdAt: "desc" },
           take: 10,
+        },
+        quotes: {
+          select: {
+            id: true,
+            quoteNumber: true,
+            status: true,
+            total: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5,
         },
       },
     });
@@ -32,9 +62,27 @@ export async function GET(
       );
     }
 
+    // Fetch related tasks using polymorphic pattern
+    const tasks = await prisma.task.findMany({
+      where: {
+        relatedType: "deal",
+        relatedId: params.id,
+      },
+      include: { assignee: { select: { id: true, name: true } } },
+      orderBy: { dueDate: "asc" },
+      take: 10,
+    });
+
+    // Combine deal data with tasks
+    const dealWithTasks = {
+      ...deal,
+      value: Number(deal.value),
+      tasks,
+    };
+
     return NextResponse.json({
       success: true,
-      data: { ...deal, value: Number(deal.value) },
+      data: dealWithTasks,
     });
   } catch (error) {
     console.error("Error fetching deal:", error);

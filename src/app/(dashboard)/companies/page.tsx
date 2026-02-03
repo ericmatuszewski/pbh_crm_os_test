@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo, Suspense, useRef, useEffect } from "react";
+import Link from "next/link";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -28,8 +29,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/shared";
-import { Plus, Building2, Search, MoreHorizontal, Pencil, Trash2, Globe, MapPin } from "lucide-react";
+import { EmptyState, LoadingState, InlineEdit } from "@/components/shared";
+import { Plus, Building2, Search, MoreHorizontal, Pencil, Trash2, Globe, MapPin, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +38,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Company, CompanySize } from "@/types";
+import { toast } from "sonner";
+import { useCompanies, useCreateCompany, useUpdateCompany, useDeleteCompany, useUrlState } from "@/hooks";
 
 const companySizeLabels: Record<CompanySize, string> = {
   STARTUP: "Startup (1-10)",
@@ -45,11 +48,16 @@ const companySizeLabels: Record<CompanySize, string> = {
   ENTERPRISE: "Enterprise (200+)",
 };
 
-export default function CompaniesPage() {
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+function CompaniesPageContent() {
+  // URL-based persistent search
+  const [search, setSearch] = useUrlState("search", "");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+
+  // Auto-focus search on mount
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -63,33 +71,22 @@ export default function CompaniesPage() {
     country: "",
   });
 
-  useEffect(() => {
-    fetchCompanies();
-  }, []);
+  // React Query hooks
+  const { data: companies = [], isLoading } = useCompanies({ search });
+  const createMutation = useCreateCompany();
+  const updateMutation = useUpdateCompany();
+  const deleteMutation = useDeleteCompany();
 
-  const fetchCompanies = async () => {
-    try {
-      const res = await fetch("/api/companies");
-      const data = await res.json();
-      if (data.success) {
-        setCompanies(data.data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch companies:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filteredCompanies = companies.filter((company) => {
-    if (!search) return true;
+  // Client-side filtering for instant search feedback
+  const filteredCompanies = useMemo(() => {
+    if (!search) return companies;
     const searchLower = search.toLowerCase();
-    return (
+    return companies.filter((company) =>
       company.name.toLowerCase().includes(searchLower) ||
       company.industry?.toLowerCase().includes(searchLower) ||
       company.city?.toLowerCase().includes(searchLower)
     );
-  });
+  }, [companies, search]);
 
   const handleOpenForm = (company?: Company) => {
     if (company) {
@@ -125,26 +122,21 @@ export default function CompaniesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const url = editingCompany
-        ? `/api/companies/${editingCompany.id}`
-        : "/api/companies";
-      const method = editingCompany ? "PUT" : "POST";
+      const data = {
+        ...formData,
+        size: formData.size || undefined,
+      };
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          size: formData.size || null,
-        }),
-      });
-
-      if (res.ok) {
-        fetchCompanies();
-        setIsFormOpen(false);
+      if (editingCompany) {
+        await updateMutation.mutateAsync({ id: editingCompany.id, data });
+        toast.success("Company updated successfully");
+      } else {
+        await createMutation.mutateAsync(data);
+        toast.success("Company created successfully");
       }
-    } catch (error) {
-      console.error("Failed to save company:", error);
+      setIsFormOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save company");
     }
   };
 
@@ -154,14 +146,10 @@ export default function CompaniesPage() {
     }
 
     try {
-      const res = await fetch(`/api/companies/${company.id}`, {
-        method: "DELETE",
-      });
-      if (res.ok) {
-        fetchCompanies();
-      }
-    } catch (error) {
-      console.error("Failed to delete company:", error);
+      await deleteMutation.mutateAsync(company.id);
+      toast.success("Company deleted successfully");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete company");
     }
   };
 
@@ -187,6 +175,7 @@ export default function CompaniesPage() {
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
+                    ref={searchInputRef}
                     placeholder="Search companies..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -197,9 +186,9 @@ export default function CompaniesPage() {
             </div>
 
             {/* Table */}
-            {loading ? (
-              <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
-                Loading...
+            {isLoading ? (
+              <div className="bg-white rounded-lg border p-8">
+                <LoadingState message="Loading companies..." />
               </div>
             ) : filteredCompanies.length > 0 ? (
               <div className="bg-white rounded-lg border">
@@ -222,7 +211,12 @@ export default function CompaniesPage() {
                               <Building2 className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                              <div className="font-medium">{company.name}</div>
+                              <Link
+                                href={`/companies/${company.id}`}
+                                className="font-medium hover:text-primary hover:underline"
+                              >
+                                {company.name}
+                              </Link>
                               {company.website && (
                                 <a
                                   href={company.website}
@@ -238,14 +232,19 @@ export default function CompaniesPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {company.industry || (
-                            <span className="text-gray-400">-</span>
-                          )}
+                          <InlineEdit
+                            value={company.industry || ""}
+                            placeholder="-"
+                            onSave={async (val) => {
+                              await updateMutation.mutateAsync({ id: company.id, data: { industry: val } });
+                              toast.success("Industry updated");
+                            }}
+                          />
                         </TableCell>
                         <TableCell>
                           {company.size ? (
                             <Badge variant="secondary">
-                              {companySizeLabels[company.size]}
+                              {companySizeLabels[company.size as CompanySize]}
                             </Badge>
                           ) : (
                             <span className="text-gray-400">-</span>
@@ -448,7 +447,10 @@ export default function CompaniesPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                {(createMutation.isPending || updateMutation.isPending) && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 {editingCompany ? "Update" : "Create"} Company
               </Button>
             </div>
@@ -456,5 +458,25 @@ export default function CompaniesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function CompaniesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen bg-slate-50">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header title="Companies" subtitle="Loading..." />
+          <main className="flex-1 overflow-y-auto p-6">
+            <div className="bg-white rounded-lg border p-8">
+              <LoadingState message="Loading companies..." />
+            </div>
+          </main>
+        </div>
+      </div>
+    }>
+      <CompaniesPageContent />
+    </Suspense>
   );
 }

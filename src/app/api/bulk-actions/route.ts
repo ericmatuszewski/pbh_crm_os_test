@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+
+// Transaction client type
+type TransactionClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
 // POST /api/bulk-actions - Execute a bulk action
 export async function POST(request: NextRequest) {
@@ -32,17 +36,21 @@ export async function POST(request: NextRequest) {
     let errorCount = 0;
     const errors: { id: string; error: string }[] = [];
 
-    // Process based on action type
+    // Process based on action type - use transactions for data integrity
     switch (action) {
       case "delete":
-        for (const id of recordIds) {
-          try {
-            await deleteEntity(entity, id);
-            successCount++;
-          } catch (error) {
-            errorCount++;
-            errors.push({ id, error: error instanceof Error ? error.message : "Unknown error" });
-          }
+        try {
+          await prisma.$transaction(async (tx) => {
+            for (const id of recordIds) {
+              await deleteEntity(tx, entity, id);
+              successCount++;
+            }
+          });
+        } catch (error) {
+          // Transaction failed - all operations rolled back
+          errorCount = recordIds.length;
+          successCount = 0;
+          errors.push({ id: "all", error: error instanceof Error ? error.message : "Transaction failed" });
         }
         break;
 
@@ -53,14 +61,17 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        for (const id of recordIds) {
-          try {
-            await updateEntity(entity, id, updateData);
-            successCount++;
-          } catch (error) {
-            errorCount++;
-            errors.push({ id, error: error instanceof Error ? error.message : "Unknown error" });
-          }
+        try {
+          await prisma.$transaction(async (tx) => {
+            for (const id of recordIds) {
+              await updateEntity(tx, entity, id, updateData);
+              successCount++;
+            }
+          });
+        } catch (error) {
+          errorCount = recordIds.length;
+          successCount = 0;
+          errors.push({ id: "all", error: error instanceof Error ? error.message : "Transaction failed" });
         }
         break;
 
@@ -71,14 +82,17 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        for (const id of recordIds) {
-          try {
-            await assignEntity(entity, id, body.assigneeId);
-            successCount++;
-          } catch (error) {
-            errorCount++;
-            errors.push({ id, error: error instanceof Error ? error.message : "Unknown error" });
-          }
+        try {
+          await prisma.$transaction(async (tx) => {
+            for (const id of recordIds) {
+              await assignEntity(tx, entity, id, body.assigneeId);
+              successCount++;
+            }
+          });
+        } catch (error) {
+          errorCount = recordIds.length;
+          successCount = 0;
+          errors.push({ id: "all", error: error instanceof Error ? error.message : "Transaction failed" });
         }
         break;
 
@@ -89,19 +103,22 @@ export async function POST(request: NextRequest) {
             { status: 400 }
           );
         }
-        for (const id of recordIds) {
-          try {
-            await addTagsToEntity(entity, id, body.tags);
-            successCount++;
-          } catch (error) {
-            errorCount++;
-            errors.push({ id, error: error instanceof Error ? error.message : "Unknown error" });
-          }
+        try {
+          await prisma.$transaction(async (tx) => {
+            for (const id of recordIds) {
+              await addTagsToEntity(tx, entity, id, body.tags);
+              successCount++;
+            }
+          });
+        } catch (error) {
+          errorCount = recordIds.length;
+          successCount = 0;
+          errors.push({ id: "all", error: error instanceof Error ? error.message : "Transaction failed" });
         }
         break;
 
       case "export":
-        // For export, we'll just collect the data
+        // For export, we'll just collect the data (read-only, no transaction needed)
         const exportData = await exportEntities(entity, recordIds);
         await prisma.bulkAction.update({
           where: { id: bulkAction.id },
@@ -199,91 +216,91 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Helper functions for entity operations
-async function deleteEntity(entity: string, id: string) {
+// Helper functions for entity operations (accept transaction client for atomicity)
+async function deleteEntity(tx: TransactionClient, entity: string, id: string) {
   switch (entity) {
     case "contacts":
-      await prisma.contact.delete({ where: { id } });
+      await tx.contact.delete({ where: { id } });
       break;
     case "companies":
-      await prisma.company.delete({ where: { id } });
+      await tx.company.delete({ where: { id } });
       break;
     case "deals":
-      await prisma.deal.delete({ where: { id } });
+      await tx.deal.delete({ where: { id } });
       break;
     case "tasks":
-      await prisma.task.delete({ where: { id } });
+      await tx.task.delete({ where: { id } });
       break;
     case "products":
-      await prisma.product.delete({ where: { id } });
+      await tx.product.delete({ where: { id } });
       break;
     default:
       throw new Error(`Unknown entity: ${entity}`);
   }
 }
 
-async function updateEntity(entity: string, id: string, data: Record<string, unknown>) {
+async function updateEntity(tx: TransactionClient, entity: string, id: string, data: Record<string, unknown>) {
   switch (entity) {
     case "contacts":
-      await prisma.contact.update({ where: { id }, data });
+      await tx.contact.update({ where: { id }, data });
       break;
     case "companies":
-      await prisma.company.update({ where: { id }, data });
+      await tx.company.update({ where: { id }, data });
       break;
     case "deals":
-      await prisma.deal.update({ where: { id }, data });
+      await tx.deal.update({ where: { id }, data });
       break;
     case "tasks":
-      await prisma.task.update({ where: { id }, data });
+      await tx.task.update({ where: { id }, data });
       break;
     case "products":
-      await prisma.product.update({ where: { id }, data });
+      await tx.product.update({ where: { id }, data });
       break;
     default:
       throw new Error(`Unknown entity: ${entity}`);
   }
 }
 
-async function assignEntity(entity: string, id: string, assigneeId: string) {
+async function assignEntity(tx: TransactionClient, entity: string, id: string, assigneeId: string) {
   switch (entity) {
     case "contacts":
-      await prisma.contact.update({ where: { id }, data: { ownerId: assigneeId } });
+      await tx.contact.update({ where: { id }, data: { ownerId: assigneeId } });
       break;
     case "deals":
-      await prisma.deal.update({ where: { id }, data: { ownerId: assigneeId } });
+      await tx.deal.update({ where: { id }, data: { ownerId: assigneeId } });
       break;
     case "tasks":
-      await prisma.task.update({ where: { id }, data: { assigneeId } });
+      await tx.task.update({ where: { id }, data: { assigneeId } });
       break;
     default:
       throw new Error(`Entity ${entity} does not support assignment`);
   }
 }
 
-async function addTagsToEntity(entity: string, id: string, newTags: string[]) {
+async function addTagsToEntity(tx: TransactionClient, entity: string, id: string, newTags: string[]) {
   switch (entity) {
     case "contacts": {
       // Contacts use Tag relation - we need to connect existing tags or create new ones
       const tagConnects = [];
       for (const tagName of newTags) {
-        // Find or create the tag
-        let tag = await prisma.tag.findUnique({ where: { name: tagName } });
+        // Find or create the tag within the transaction
+        let tag = await tx.tag.findUnique({ where: { name: tagName } });
         if (!tag) {
-          tag = await prisma.tag.create({ data: { name: tagName } });
+          tag = await tx.tag.create({ data: { name: tagName } });
         }
         tagConnects.push({ id: tag.id });
       }
-      await prisma.contact.update({
+      await tx.contact.update({
         where: { id },
         data: { tags: { connect: tagConnects } }
       });
       break;
     }
     case "products": {
-      const product = await prisma.product.findUnique({ where: { id }, select: { tags: true } });
+      const product = await tx.product.findUnique({ where: { id }, select: { tags: true } });
       const existingTags = product?.tags || [];
       const mergedTags = [...new Set([...existingTags, ...newTags])];
-      await prisma.product.update({ where: { id }, data: { tags: mergedTags } });
+      await tx.product.update({ where: { id }, data: { tags: mergedTags } });
       break;
     }
     default:

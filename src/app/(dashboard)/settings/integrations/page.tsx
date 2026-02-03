@@ -88,8 +88,6 @@ function IntegrationsPageContent() {
     const error = searchParams.get("error");
 
     if (microsoftStatus === "connected") {
-      // Show success message
-      console.log("Microsoft connected successfully", email);
       fetchMailboxes();
     }
 

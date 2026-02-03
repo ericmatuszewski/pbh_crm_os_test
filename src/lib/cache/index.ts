@@ -118,7 +118,6 @@ class RedisCacheProvider implements CacheProvider {
         });
 
         this.client.on("connect", () => {
-          console.log("Redis connected");
           this.connected = true;
         });
 
@@ -465,8 +464,6 @@ export async function warmCache(): Promise<void> {
       orderBy: { name: "asc" },
     });
     await cache.set(cacheKeys.products(), products, 3600);
-
-    console.log(`Cache warmed successfully (Redis: ${cache.isRedisConnected() ? "connected" : "memory fallback"})`);
   } catch (error) {
     console.error("Cache warming failed:", error);
   }

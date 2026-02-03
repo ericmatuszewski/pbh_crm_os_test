@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -8,145 +8,57 @@ import { ContactTable } from "@/components/contacts/ContactTable";
 import { ContactFilters } from "@/components/contacts/ContactFilters";
 import { ContactForm } from "@/components/contacts/ContactForm";
 import { ImportDialog } from "@/components/import";
-import { EmptyState } from "@/components/shared";
-import { Plus, Users, Upload } from "lucide-react";
-import { Contact, ContactStatus, CreateContactInput } from "@/types";
+import { EmptyState, LoadingState } from "@/components/shared";
+import { Plus, Users, Upload, AlertCircle } from "lucide-react";
+import { Contact, CreateContactInput } from "@/types";
+import { toast } from "sonner";
+import { useContacts, useCreateContact, useUpdateContact, useDeleteContact } from "@/hooks";
+import { useCompanies } from "@/hooks";
+import { useDebounce, useUrlFilters } from "@/hooks";
 
-// Sample data for demonstration
-const sampleContacts: Contact[] = [
-  {
-    id: "1",
-    firstName: "John",
-    lastName: "Smith",
-    email: "john.smith@acmecorp.com",
-    phone: "+1 (555) 123-4567",
-    title: "VP of Sales",
-    status: ContactStatus.CUSTOMER,
-    companyId: "1",
-    company: { id: "1", name: "Acme Corp", website: null, industry: "Technology", size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() },
-    source: "Website",
-    ownerId: null,
-    leadScore: 125,
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date(),
-  },
-  {
-    id: "2",
-    firstName: "Sarah",
-    lastName: "Johnson",
-    email: "sarah.j@techstart.io",
-    phone: "+1 (555) 234-5678",
-    title: "CEO",
-    status: ContactStatus.QUALIFIED,
-    companyId: "2",
-    company: { id: "2", name: "TechStart Inc", website: null, industry: "SaaS", size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() },
-    source: "Referral",
-    ownerId: null,
-    leadScore: 75,
-    createdAt: new Date("2024-01-18"),
-    updatedAt: new Date(),
-  },
-  {
-    id: "3",
-    firstName: "Michael",
-    lastName: "Chen",
-    email: "m.chen@globaltech.com",
-    phone: "+1 (555) 345-6789",
-    title: "Procurement Manager",
-    status: ContactStatus.LEAD,
-    companyId: "3",
-    company: { id: "3", name: "GlobalTech", website: null, industry: "Manufacturing", size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() },
-    source: "Trade Show",
-    ownerId: null,
-    leadScore: 20,
-    createdAt: new Date("2024-01-20"),
-    updatedAt: new Date(),
-  },
-  {
-    id: "4",
-    firstName: "Emily",
-    lastName: "Davis",
-    email: "emily@innovate.co",
-    phone: "+1 (555) 456-7890",
-    title: "Product Director",
-    status: ContactStatus.CUSTOMER,
-    companyId: "4",
-    company: { id: "4", name: "Innovate Co", website: null, industry: "Consulting", size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() },
-    source: "LinkedIn",
-    ownerId: null,
-    leadScore: 110,
-    createdAt: new Date("2024-01-10"),
-    updatedAt: new Date(),
-  },
-  {
-    id: "5",
-    firstName: "Robert",
-    lastName: "Williams",
-    email: "r.williams@enterprise.net",
-    phone: "+1 (555) 567-8901",
-    title: "CTO",
-    status: ContactStatus.PARTNER,
-    companyId: "5",
-    company: { id: "5", name: "Enterprise Net", website: null, industry: "IT Services", size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() },
-    source: "Cold Email",
-    ownerId: null,
-    leadScore: 45,
-    createdAt: new Date("2024-01-05"),
-    updatedAt: new Date(),
-  },
-];
+function ContactsPageContent() {
+  // URL-based persistent filters
+  const { values: filters, setValues: setFilters, clearAll } = useUrlFilters({
+    search: "",
+    status: "",
+  });
 
-const sampleCompanies = [
-  { id: "1", name: "Acme Corp" },
-  { id: "2", name: "TechStart Inc" },
-  { id: "3", name: "GlobalTech" },
-  { id: "4", name: "Innovate Co" },
-  { id: "5", name: "Enterprise Net" },
-];
-
-export default function ContactsPage() {
-  const [contacts, setContacts] = useState<Contact[]>(sampleContacts);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
 
-  // Filter contacts
-  const filteredContacts = contacts.filter((contact) => {
-    const matchesSearch =
-      !search ||
-      `${contact.firstName} ${contact.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-      contact.email?.toLowerCase().includes(search.toLowerCase()) ||
-      contact.company?.name.toLowerCase().includes(search.toLowerCase());
+  // Debounce search for better performance
+  const debouncedSearch = useDebounce(filters.search, 300);
 
-    const matchesStatus = !statusFilter || statusFilter === "all" || contact.status === statusFilter;
+  // React Query hooks for data fetching
+  const {
+    data: contacts = [],
+    isLoading,
+    error,
+    refetch: refetchContacts
+  } = useContacts({ search: debouncedSearch, status: filters.status });
 
-    return matchesSearch && matchesStatus;
-  });
+  const { data: companiesData = [] } = useCompanies();
+
+  // Transform companies for the form
+  const companies = useMemo(() =>
+    companiesData.map((c) => ({ id: c.id, name: c.name })),
+    [companiesData]
+  );
+
+  // Mutations
+  const createMutation = useCreateContact();
+  const updateMutation = useUpdateContact();
+  const deleteMutation = useDeleteContact();
 
   const handleCreateContact = async (data: CreateContactInput) => {
-    const newContact: Contact = {
-      id: `${Date.now()}`,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      email: data.email || null,
-      phone: data.phone || null,
-      title: data.title || null,
-      status: data.status || ContactStatus.LEAD,
-      companyId: data.companyId || null,
-      company: data.companyId
-        ? sampleCompanies.find((c) => c.id === data.companyId)
-          ? { id: data.companyId, name: sampleCompanies.find((c) => c.id === data.companyId)!.name, website: null, industry: null, size: null, address: null, city: null, county: null, postcode: null, country: null, createdAt: new Date(), updatedAt: new Date() }
-          : undefined
-        : undefined,
-      source: data.source || null,
-      ownerId: data.ownerId || null,
-      leadScore: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    setContacts([newContact, ...contacts]);
+    try {
+      await createMutation.mutateAsync(data);
+      toast.success("Contact created successfully");
+      setIsFormOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create contact");
+    }
   };
 
   const handleEditContact = (contact: Contact) => {
@@ -157,28 +69,39 @@ export default function ContactsPage() {
   const handleUpdateContact = async (data: CreateContactInput) => {
     if (!editingContact) return;
 
-    setContacts(
-      contacts.map((c) =>
-        c.id === editingContact.id
-          ? {
-              ...c,
-              ...data,
-              email: data.email || null,
-              phone: data.phone || null,
-              title: data.title || null,
-              companyId: data.companyId || null,
-              source: data.source || null,
-              updatedAt: new Date(),
-            }
-          : c
-      )
-    );
-    setEditingContact(null);
+    try {
+      await updateMutation.mutateAsync({ id: editingContact.id, data });
+      toast.success("Contact updated successfully");
+      setEditingContact(null);
+      setIsFormOpen(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update contact");
+    }
   };
 
-  const handleDeleteContact = (contact: Contact) => {
-    if (window.confirm(`Are you sure you want to delete ${contact.firstName} ${contact.lastName}?`)) {
-      setContacts(contacts.filter((c) => c.id !== contact.id));
+  const handleDeleteContact = async (contact: Contact) => {
+    if (!window.confirm(`Are you sure you want to delete ${contact.firstName} ${contact.lastName}?`)) {
+      return;
+    }
+
+    try {
+      await deleteMutation.mutateAsync(contact.id);
+      toast.success("Contact deleted successfully");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete contact");
+    }
+  };
+
+  const handleBulkDelete = async (ids: string[]) => {
+    if (!window.confirm(`Are you sure you want to delete ${ids.length} contacts?`)) {
+      return;
+    }
+
+    try {
+      await Promise.all(ids.map((id) => deleteMutation.mutateAsync(id)));
+      toast.success(`${ids.length} contacts deleted successfully`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete contacts");
     }
   };
 
@@ -210,21 +133,35 @@ export default function ContactsPage() {
         <main className="flex-1 overflow-y-auto p-6">
           <div className="space-y-4">
             <ContactFilters
-              search={search}
-              onSearchChange={setSearch}
-              status={statusFilter}
-              onStatusChange={setStatusFilter}
-              onClear={() => {
-                setSearch("");
-                setStatusFilter("");
-              }}
+              search={filters.search}
+              onSearchChange={(value) => setFilters({ search: value })}
+              status={filters.status}
+              onStatusChange={(value) => setFilters({ status: value })}
+              onClear={clearAll}
+              autoFocus
             />
 
-            {filteredContacts.length > 0 ? (
+            {isLoading ? (
+              <div className="bg-white rounded-lg border p-8">
+                <LoadingState message="Loading contacts..." />
+              </div>
+            ) : error ? (
+              <div className="bg-white rounded-lg border p-8">
+                <div className="flex flex-col items-center justify-center text-center">
+                  <AlertCircle className="h-12 w-12 text-red-400 mb-4" />
+                  <h3 className="text-lg font-medium text-slate-900 mb-1">Error loading contacts</h3>
+                  <p className="text-sm text-slate-500 mb-4">{error instanceof Error ? error.message : "Unknown error"}</p>
+                  <Button variant="outline" onClick={() => refetchContacts()}>
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            ) : contacts.length > 0 ? (
               <ContactTable
-                contacts={filteredContacts}
+                contacts={contacts}
                 onEdit={handleEditContact}
                 onDelete={handleDeleteContact}
+                onBulkDelete={handleBulkDelete}
               />
             ) : (
               <div className="bg-white rounded-lg border">
@@ -232,12 +169,12 @@ export default function ContactsPage() {
                   icon={<Users className="h-12 w-12" />}
                   title="No contacts found"
                   description={
-                    search || statusFilter
+                    filters.search || filters.status
                       ? "Try adjusting your filters to find what you're looking for."
                       : "Get started by adding your first contact."
                   }
                   action={
-                    !search && !statusFilter
+                    !filters.search && !filters.status
                       ? { label: "Add Contact", onClick: () => setIsFormOpen(true) }
                       : undefined
                   }
@@ -266,7 +203,7 @@ export default function ContactsPage() {
               }
             : undefined
         }
-        companies={sampleCompanies}
+        companies={companies}
         isEdit={!!editingContact}
       />
 
@@ -274,10 +211,30 @@ export default function ContactsPage() {
         open={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         onImportComplete={() => {
-          // In a real app, you would refetch contacts here
           setIsImportOpen(false);
+          refetchContacts();
         }}
       />
     </div>
+  );
+}
+
+export default function ContactsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-screen bg-slate-50">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header title="Contacts" subtitle="Loading..." />
+          <main className="flex-1 overflow-y-auto p-6">
+            <div className="bg-white rounded-lg border p-8">
+              <LoadingState message="Loading contacts..." />
+            </div>
+          </main>
+        </div>
+      </div>
+    }>
+      <ContactsPageContent />
+    </Suspense>
   );
 }

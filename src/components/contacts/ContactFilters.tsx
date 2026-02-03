@@ -18,6 +18,7 @@ interface ContactFiltersProps {
   status: string;
   onStatusChange: (status: string) => void;
   onClear: () => void;
+  autoFocus?: boolean;
 }
 
 export function ContactFilters({
@@ -26,6 +27,7 @@ export function ContactFilters({
   status,
   onStatusChange,
   onClear,
+  autoFocus = false,
 }: ContactFiltersProps) {
   const hasFilters = search || status;
 
@@ -38,6 +40,7 @@ export function ContactFilters({
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-9"
+          autoFocus={autoFocus}
         />
       </div>
 

@@ -214,21 +214,19 @@ function SearchPageContent() {
     loadData();
   }, [currentUserId]);
 
-  // Search function
+  // Search function - allows empty query to return top 10 results
   const performSearch = useCallback(async (searchQuery: string, entity?: string) => {
-    if (!searchQuery || searchQuery.length < 2) {
-      setResults([]);
-      setTotal(0);
-      return;
-    }
-
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        q: searchQuery,
-        userId: currentUserId,
-        limit: "50",
+        limit: searchQuery ? "50" : "10", // Return top 10 if no query
       });
+      if (searchQuery) {
+        params.set("q", searchQuery);
+      }
+      if (currentUserId) {
+        params.set("userId", currentUserId);
+      }
       if (entity) {
         params.set("entity", entity);
       }
@@ -244,16 +242,17 @@ function SearchPageContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentUserId]);
 
-  // Debounced search
+  // Trigger search on load and when params change
   useEffect(() => {
+    // Small delay for debouncing typed input, but run immediately on first load
     const timer = setTimeout(() => {
       performSearch(query, selectedEntity === "__all__" ? undefined : selectedEntity);
-    }, 300);
+    }, query ? 300 : 0);
 
     return () => clearTimeout(timer);
-  }, [query, selectedEntity, performSearch]);
+  }, [query, selectedEntity, performSearch, currentUserId]);
 
   // Track recently viewed
   const trackView = async (result: SearchResult) => {
@@ -557,13 +556,6 @@ function SearchPageContent() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
                 <p className="mt-2 text-sm text-muted-foreground">
                   Searching...
-                </p>
-              </div>
-            ) : query.length < 2 ? (
-              <div className="p-8 text-center">
-                <Search className="h-12 w-12 text-muted-foreground/50 mx-auto" />
-                <p className="mt-2 text-muted-foreground">
-                  Type at least 2 characters to search
                 </p>
               </div>
             ) : results.length === 0 ? (

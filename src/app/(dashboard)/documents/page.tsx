@@ -191,7 +191,9 @@ export default function DocumentsPage() {
       formData.append("description", uploadDescription);
       formData.append("entityType", uploadEntityType);
       formData.append("entityId", uploadEntityId);
-      formData.append("userId", currentUserId);
+      if (currentUserId) {
+        formData.append("userId", currentUserId);
+      }
 
       const res = await fetch("/api/documents", {
         method: "POST",

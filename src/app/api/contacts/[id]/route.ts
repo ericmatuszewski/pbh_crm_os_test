@@ -7,15 +7,19 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Fetch contact with related data
     const contact = await prisma.contact.findUnique({
       where: { id: params.id },
       include: {
         company: true,
         tags: true,
         deals: {
-          include: { owner: { select: { id: true, name: true, email: true } } },
+          include: {
+            owner: { select: { id: true, name: true, email: true } },
+            pipelineStage: { select: { id: true, name: true, probability: true } },
+          },
           orderBy: { createdAt: "desc" },
-          take: 5,
+          take: 10,
         },
         activities: {
           include: { user: { select: { id: true, name: true } } },
@@ -25,6 +29,12 @@ export async function GET(
         notes: {
           orderBy: { createdAt: "desc" },
           take: 10,
+        },
+        scheduledCalls: {
+          include: { assignedTo: { select: { id: true, name: true } } },
+          where: { status: "SCHEDULED" },
+          orderBy: { scheduledAt: "asc" },
+          take: 5,
         },
       },
     });
@@ -36,7 +46,24 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: contact });
+    // Fetch related tasks using polymorphic pattern
+    const tasks = await prisma.task.findMany({
+      where: {
+        relatedType: "contact",
+        relatedId: params.id,
+      },
+      include: { assignee: { select: { id: true, name: true } } },
+      orderBy: { dueDate: "asc" },
+      take: 10,
+    });
+
+    // Combine contact data with tasks
+    const contactWithTasks = {
+      ...contact,
+      tasks,
+    };
+
+    return NextResponse.json({ success: true, data: contactWithTasks });
   } catch (error) {
     console.error("Error fetching contact:", error);
     return NextResponse.json(

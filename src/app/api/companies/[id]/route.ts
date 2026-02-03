@@ -11,11 +11,28 @@ export async function GET(
       where: { id: params.id },
       include: {
         contacts: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+            title: true,
+            status: true,
+            leadScore: true,
+            createdAt: true,
+          },
           orderBy: { createdAt: "desc" },
+          take: 20,
         },
         deals: {
-          include: { owner: { select: { id: true, name: true } } },
+          include: {
+            owner: { select: { id: true, name: true, email: true } },
+            pipelineStage: { select: { id: true, name: true, probability: true } },
+            contact: { select: { id: true, firstName: true, lastName: true } },
+          },
           orderBy: { createdAt: "desc" },
+          take: 10,
         },
         notes: {
           orderBy: { createdAt: "desc" },

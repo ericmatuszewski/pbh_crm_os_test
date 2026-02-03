@@ -198,10 +198,7 @@ export async function POST() {
           data: { lastRunAt: new Date() },
         });
 
-        // Log the report that would be emailed
         // In a real implementation, this would send emails to report.recipients
-        console.log(`[Scheduled Report] "${report.name}" - ${total} records`);
-        console.log(`  Recipients: ${report.recipients.join(", ") || "None configured"}`);
 
         results.push({
           id: report.id,

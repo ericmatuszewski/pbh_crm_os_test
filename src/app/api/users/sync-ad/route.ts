@@ -68,13 +68,19 @@ interface ADUserDetails {
   mobile?: string;
 }
 
+// Internal type for ldapjs pojo attribute structure
+interface LDAPAttribute {
+  type?: string;
+  values?: (string | Buffer)[];
+}
+
 function parseADDetails(entry: ldap.SearchEntry): ADUserDetails {
   const entryAny = entry as any;
   const pojo = entryAny.pojo;
 
   const getAttr = (name: string): string => {
     if (pojo && pojo.attributes && Array.isArray(pojo.attributes)) {
-      const attr = pojo.attributes.find((a: any) =>
+      const attr = (pojo.attributes as LDAPAttribute[]).find((a) =>
         a.type?.toLowerCase() === name.toLowerCase()
       );
       if (attr && attr.values && attr.values.length > 0) {

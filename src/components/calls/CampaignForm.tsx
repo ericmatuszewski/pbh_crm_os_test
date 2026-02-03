@@ -25,6 +25,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { CallCampaign } from "@/types";
 
 const createCampaignSchema = z.object({
   name: z.string().min(1, "Campaign name is required"),
@@ -45,7 +46,7 @@ interface CampaignFormProps {
     startDate?: string | null;
     endDate?: string | null;
   };
-  onSuccess?: (campaign: any) => void;
+  onSuccess?: (campaign: CallCampaign) => void;
   onCancel?: () => void;
 }
 

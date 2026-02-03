@@ -29,7 +29,6 @@ export async function POST(request: NextRequest) {
           isActive: true,
         },
       });
-      console.log("Created PBH business:", pbhBusiness.id);
     }
 
     // Assign all existing users to PBH with ADMIN role
