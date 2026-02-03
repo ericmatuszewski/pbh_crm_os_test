@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { parse } from "csv-parse/sync";
 
 export interface ParsedData {
@@ -30,37 +30,53 @@ export function parseCSV(buffer: Buffer): ParsedData {
   };
 }
 
-export function parseExcel(buffer: Buffer): ParsedData {
-  const workbook = XLSX.read(buffer, { type: "buffer" });
+export async function parseExcel(buffer: Buffer): Promise<ParsedData> {
+  const workbook = new ExcelJS.Workbook();
+  // Use stream-based reading for better type compatibility
+  const stream = require("stream");
+  const bufferStream = new stream.PassThrough();
+  bufferStream.end(buffer);
+  await workbook.xlsx.read(bufferStream);
 
   // Get the first sheet
-  const sheetName = workbook.SheetNames[0];
-  if (!sheetName) {
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet || worksheet.rowCount === 0) {
     return { columns: [], rows: [], rowCount: 0 };
   }
 
-  const worksheet = workbook.Sheets[sheetName];
-
-  // Convert to JSON with headers
-  const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-    defval: "",
-    raw: false,
+  // Get header row (first row)
+  const headerRow = worksheet.getRow(1);
+  const columns: string[] = [];
+  headerRow.eachCell((cell, colNumber) => {
+    columns[colNumber - 1] = cell.text?.toString() || `Column${colNumber}`;
   });
 
-  if (records.length === 0) {
+  if (columns.length === 0) {
     return { columns: [], rows: [], rowCount: 0 };
   }
 
-  // Convert all values to strings
-  const rows = records.map((row) => {
-    const stringRow: Record<string, string> = {};
-    for (const [key, value] of Object.entries(row)) {
-      stringRow[key] = value?.toString() ?? "";
+  // Get data rows (starting from row 2)
+  const rows: Record<string, string>[] = [];
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return; // Skip header row
+
+    const rowData: Record<string, string> = {};
+    row.eachCell((cell, colNumber) => {
+      const columnName = columns[colNumber - 1];
+      if (columnName) {
+        rowData[columnName] = cell.text?.toString() ?? "";
+      }
+    });
+
+    // Fill in missing columns with empty strings
+    for (const col of columns) {
+      if (!(col in rowData)) {
+        rowData[col] = "";
+      }
     }
-    return stringRow;
-  });
 
-  const columns = Object.keys(rows[0]);
+    rows.push(rowData);
+  });
 
   return {
     columns,
@@ -69,7 +85,7 @@ export function parseExcel(buffer: Buffer): ParsedData {
   };
 }
 
-export function parseFile(buffer: Buffer, filename: string): ParsedData {
+export async function parseFile(buffer: Buffer, filename: string): Promise<ParsedData> {
   const extension = filename.toLowerCase().split(".").pop();
 
   switch (extension) {

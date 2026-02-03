@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { createContactSchema, contactFiltersSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
 import { getCurrentBusiness, buildBusinessScopeFilter } from "@/lib/business";
+import { handleApiError, noBusinessError } from "@/lib/api/errors";
+import { apiPaginated, apiCreated } from "@/lib/api/response";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,6 +15,13 @@ export async function GET(request: NextRequest) {
       search: searchParams.get("search"),
       status: searchParams.get("status"),
       companyId: searchParams.get("companyId"),
+      ownerId: searchParams.get("ownerId"),
+      tagId: searchParams.get("tagId"),
+      source: searchParams.get("source"),
+      createdAfter: searchParams.get("createdAfter"),
+      createdBefore: searchParams.get("createdBefore"),
+      sortBy: searchParams.get("sortBy"),
+      sortOrder: searchParams.get("sortOrder"),
     });
 
     // Get current business for scoping
@@ -32,6 +41,7 @@ export async function GET(request: NextRequest) {
         { firstName: { contains: filters.search, mode: "insensitive" } },
         { lastName: { contains: filters.search, mode: "insensitive" } },
         { email: { contains: filters.search, mode: "insensitive" } },
+        { phone: { contains: filters.search, mode: "insensitive" } },
       ];
     }
 
@@ -43,6 +53,35 @@ export async function GET(request: NextRequest) {
       where.companyId = filters.companyId;
     }
 
+    if (filters.ownerId) {
+      where.ownerId = filters.ownerId;
+    }
+
+    if (filters.tagId) {
+      where.tags = {
+        some: { id: filters.tagId },
+      };
+    }
+
+    if (filters.source) {
+      where.source = { contains: filters.source, mode: "insensitive" };
+    }
+
+    if (filters.createdAfter || filters.createdBefore) {
+      where.createdAt = {};
+      if (filters.createdAfter) {
+        where.createdAt.gte = new Date(filters.createdAfter);
+      }
+      if (filters.createdBefore) {
+        where.createdAt.lte = new Date(filters.createdBefore);
+      }
+    }
+
+    // Build sort order
+    const sortField = filters.sortBy || "createdAt";
+    const sortDirection = filters.sortOrder || "desc";
+    const orderBy: Prisma.ContactOrderByWithRelationInput = { [sortField]: sortDirection };
+
     const [contacts, total] = await Promise.all([
       prisma.contact.findMany({
         where,
@@ -50,29 +89,21 @@ export async function GET(request: NextRequest) {
           company: { select: { id: true, name: true } },
           tags: true,
         },
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip: (filters.page - 1) * filters.limit,
         take: filters.limit,
       }),
       prisma.contact.count({ where }),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      data: contacts,
-      meta: {
-        page: filters.page,
-        limit: filters.limit,
-        total,
-        totalPages: Math.ceil(total / filters.limit),
-      },
+    return apiPaginated(contacts, {
+      page: filters.page,
+      limit: filters.limit,
+      total,
     });
   } catch (error) {
     console.error("Error fetching contacts:", error);
-    return NextResponse.json(
-      { success: false, error: { code: "FETCH_ERROR", message: "Failed to fetch contacts" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "fetch", "Contact");
   }
 }
 
@@ -84,10 +115,7 @@ export async function POST(request: NextRequest) {
     // Get current business
     const business = await getCurrentBusiness(request);
     if (!business) {
-      return NextResponse.json(
-        { success: false, error: { code: "NO_BUSINESS", message: "No business selected" } },
-        { status: 400 }
-      );
+      return noBusinessError();
     }
 
     const contact = await prisma.contact.create({
@@ -109,18 +137,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, data: contact }, { status: 201 });
+    return apiCreated(contact);
   } catch (error) {
     console.error("Error creating contact:", error);
-    if (error instanceof Error && error.name === "ZodError") {
-      return NextResponse.json(
-        { success: false, error: { code: "VALIDATION_ERROR", message: "Invalid input data" } },
-        { status: 400 }
-      );
-    }
-    return NextResponse.json(
-      { success: false, error: { code: "CREATE_ERROR", message: "Failed to create contact" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "create", "Contact");
   }
 }

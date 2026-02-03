@@ -64,6 +64,11 @@ export const createTaskSchema = z.object({
   assigneeId: z.string().min(1, "Assignee is required"),
   relatedType: z.string().optional(),
   relatedId: z.string().optional(),
+  dependsOnId: z.string().optional().nullable(),
+  isRecurring: z.boolean().optional(),
+  recurrencePattern: z.string().optional().nullable(),
+  recurrenceInterval: z.number().optional().nullable(),
+  recurrenceEndDate: z.string().optional().nullable(),
 });
 
 export const updateTaskSchema = createTaskSchema.partial();
@@ -97,6 +102,13 @@ export const contactFiltersSchema = paginationSchema.extend({
   search: z.string().nullish(),
   status: z.enum(["LEAD", "QUALIFIED", "CUSTOMER", "CHURNED", "PARTNER"]).nullish(),
   companyId: z.string().nullish(),
+  ownerId: z.string().nullish(),
+  tagId: z.string().nullish(),
+  source: z.string().nullish(),
+  createdAfter: z.string().nullish(),
+  createdBefore: z.string().nullish(),
+  sortBy: z.enum(["createdAt", "firstName", "lastName", "email", "status"]).nullish(),
+  sortOrder: z.enum(["asc", "desc"]).nullish(),
 });
 
 export const dealFiltersSchema = paginationSchema.extend({
@@ -112,6 +124,17 @@ export const dealFiltersSchema = paginationSchema.extend({
   ownerId: z.string().nullish(),
   minValue: z.preprocess((val) => (val === null || val === "" ? undefined : val), z.coerce.number().optional()),
   maxValue: z.preprocess((val) => (val === null || val === "" ? undefined : val), z.coerce.number().optional()),
+  pipelineId: z.string().nullish(),
+  stageId: z.string().nullish(),
+  companyId: z.string().nullish(),
+  contactId: z.string().nullish(),
+  status: z.enum(["OPEN", "WON", "LOST"]).nullish(),
+  createdAfter: z.string().nullish(),
+  createdBefore: z.string().nullish(),
+  expectedCloseAfter: z.string().nullish(),
+  expectedCloseBefore: z.string().nullish(),
+  sortBy: z.enum(["createdAt", "title", "value", "expectedCloseDate", "stage"]).nullish(),
+  sortOrder: z.enum(["asc", "desc"]).nullish(),
 });
 
 export const taskFiltersSchema = paginationSchema.extend({

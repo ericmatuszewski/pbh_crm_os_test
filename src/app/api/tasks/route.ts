@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { createTaskSchema, taskFiltersSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
 import { getCurrentBusiness, buildBusinessScopeFilter } from "@/lib/business";
 import { getCurrentUserId } from "@/lib/auth/get-current-user";
+import { handleApiError, noBusinessError } from "@/lib/api/errors";
+import { apiPaginated, apiCreated } from "@/lib/api/response";
 
 export async function GET(request: NextRequest) {
   try {
@@ -53,22 +55,31 @@ export async function GET(request: NextRequest) {
       prisma.task.count({ where }),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      data: tasks,
-      meta: {
-        page: filters.page,
-        limit: filters.limit,
-        total,
-        totalPages: Math.ceil(total / filters.limit),
-      },
+    // Fetch dependency info for tasks that have dependencies
+    const taskIds = tasks.filter(t => t.dependsOnId).map(t => t.dependsOnId as string);
+    const dependencies = taskIds.length > 0
+      ? await prisma.task.findMany({
+          where: { id: { in: taskIds } },
+          select: { id: true, title: true, status: true },
+        })
+      : [];
+
+    const dependencyMap = new Map(dependencies.map(d => [d.id, d]));
+
+    // Enrich tasks with dependency info
+    const enrichedTasks = tasks.map(task => ({
+      ...task,
+      dependsOn: task.dependsOnId ? dependencyMap.get(task.dependsOnId) : null,
+    }));
+
+    return apiPaginated(enrichedTasks, {
+      page: filters.page,
+      limit: filters.limit,
+      total,
     });
   } catch (error) {
     console.error("Error fetching tasks:", error);
-    return NextResponse.json(
-      { success: false, error: { code: "FETCH_ERROR", message: "Failed to fetch tasks" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "fetch", "Task");
   }
 }
 
@@ -90,10 +101,7 @@ export async function POST(request: NextRequest) {
     // Get current business
     const business = await getCurrentBusiness(request);
     if (!business) {
-      return NextResponse.json(
-        { success: false, error: { code: "NO_BUSINESS", message: "No business selected" } },
-        { status: 400 }
-      );
+      return noBusinessError();
     }
 
     const task = await prisma.task.create({
@@ -106,6 +114,11 @@ export async function POST(request: NextRequest) {
         assigneeId: data.assigneeId,
         relatedType: data.relatedType || null,
         relatedId: data.relatedId || null,
+        dependsOnId: data.dependsOnId || null,
+        isRecurring: data.isRecurring || false,
+        recurrencePattern: data.recurrencePattern || null,
+        recurrenceInterval: data.recurrenceInterval || null,
+        recurrenceEndDate: data.recurrenceEndDate ? new Date(data.recurrenceEndDate) : null,
         businessId: business.id,
       },
       include: {
@@ -113,12 +126,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, data: task }, { status: 201 });
+    return apiCreated(task);
   } catch (error) {
     console.error("Error creating task:", error);
-    return NextResponse.json(
-      { success: false, error: { code: "CREATE_ERROR", message: "Failed to create task" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "create", "Task");
   }
 }

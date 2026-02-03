@@ -1,6 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { NotificationType, NotificationPriority } from "@prisma/client";
 
+// Dynamic import to avoid circular dependencies
+let broadcastToUser: ((userId: string, data: unknown) => void) | null = null;
+
+export function setBroadcastFunction(fn: (userId: string, data: unknown) => void) {
+  broadcastToUser = fn;
+}
+
 interface CreateNotificationOptions {
   userId: string;
   type: NotificationType;
@@ -51,6 +58,22 @@ export async function createNotification(options: CreateNotificationOptions): Pr
       metadata: options.metadata ? JSON.parse(JSON.stringify(options.metadata)) : undefined,
     },
   });
+
+  // Broadcast real-time notification to the user
+  if (broadcastToUser) {
+    broadcastToUser(options.userId, {
+      type: "notification",
+      notification: {
+        id: notification.id,
+        title: options.title,
+        message: options.message,
+        type: options.type,
+        priority: options.priority || "NORMAL",
+        link: options.link,
+        createdAt: notification.createdAt.toISOString(),
+      },
+    });
+  }
 
   // Handle email notification (in production, this would queue an email)
   if (preference?.email !== false && preference?.emailImmediate !== false) {

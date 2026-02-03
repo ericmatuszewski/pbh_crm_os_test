@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Parse the file
     const buffer = Buffer.from(await file.arrayBuffer());
-    const parsed = parseFile(buffer, file.name);
+    const parsed = await parseFile(buffer, file.name);
 
     if (parsed.rowCount === 0) {
       return NextResponse.json(

@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { createDealSchema, dealFiltersSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
 import { getCurrentBusiness, buildBusinessScopeFilter } from "@/lib/business";
 import { triggerDealCreated } from "@/lib/scoring/trigger";
 import { getCurrentUserId } from "@/lib/auth/get-current-user";
+import { handleApiError, noBusinessError } from "@/lib/api/errors";
+import { apiPaginated, apiCreated } from "@/lib/api/response";
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,6 +19,17 @@ export async function GET(request: NextRequest) {
       ownerId: searchParams.get("ownerId"),
       minValue: searchParams.get("minValue"),
       maxValue: searchParams.get("maxValue"),
+      pipelineId: searchParams.get("pipelineId"),
+      stageId: searchParams.get("stageId"),
+      companyId: searchParams.get("companyId"),
+      contactId: searchParams.get("contactId"),
+      status: searchParams.get("status"),
+      createdAfter: searchParams.get("createdAfter"),
+      createdBefore: searchParams.get("createdBefore"),
+      expectedCloseAfter: searchParams.get("expectedCloseAfter"),
+      expectedCloseBefore: searchParams.get("expectedCloseBefore"),
+      sortBy: searchParams.get("sortBy"),
+      sortOrder: searchParams.get("sortOrder"),
     });
 
     // Get current business for scoping
@@ -32,7 +45,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (filters.search) {
-      where.title = { contains: filters.search, mode: "insensitive" };
+      where.OR = [
+        { title: { contains: filters.search, mode: "insensitive" } },
+        { contact: { firstName: { contains: filters.search, mode: "insensitive" } } },
+        { contact: { lastName: { contains: filters.search, mode: "insensitive" } } },
+        { company: { name: { contains: filters.search, mode: "insensitive" } } },
+      ];
     }
 
     if (filters.stage) {
@@ -53,6 +71,58 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    if (filters.pipelineId) {
+      where.pipelineId = filters.pipelineId;
+    }
+
+    if (filters.stageId) {
+      where.stageId = filters.stageId;
+    }
+
+    if (filters.companyId) {
+      where.companyId = filters.companyId;
+    }
+
+    if (filters.contactId) {
+      where.contactId = filters.contactId;
+    }
+
+    if (filters.status) {
+      // Map status to stage values
+      if (filters.status === "OPEN") {
+        where.stage = { in: ["QUALIFICATION", "DISCOVERY", "PROPOSAL", "NEGOTIATION"] };
+      } else if (filters.status === "WON") {
+        where.stage = "CLOSED_WON";
+      } else if (filters.status === "LOST") {
+        where.stage = "CLOSED_LOST";
+      }
+    }
+
+    if (filters.createdAfter || filters.createdBefore) {
+      where.createdAt = {};
+      if (filters.createdAfter) {
+        where.createdAt.gte = new Date(filters.createdAfter);
+      }
+      if (filters.createdBefore) {
+        where.createdAt.lte = new Date(filters.createdBefore);
+      }
+    }
+
+    if (filters.expectedCloseAfter || filters.expectedCloseBefore) {
+      where.expectedCloseDate = {};
+      if (filters.expectedCloseAfter) {
+        where.expectedCloseDate.gte = new Date(filters.expectedCloseAfter);
+      }
+      if (filters.expectedCloseBefore) {
+        where.expectedCloseDate.lte = new Date(filters.expectedCloseBefore);
+      }
+    }
+
+    // Build sort order
+    const sortField = filters.sortBy || "createdAt";
+    const sortDirection = filters.sortOrder || "desc";
+    const orderBy: Prisma.DealOrderByWithRelationInput = { [sortField]: sortDirection };
+
     const [deals, total] = await Promise.all([
       prisma.deal.findMany({
         where,
@@ -63,7 +133,7 @@ export async function GET(request: NextRequest) {
           pipelineStage: { select: { id: true, name: true, color: true, probability: true } },
           pipeline: { select: { id: true, name: true } },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy,
         skip: (filters.page - 1) * filters.limit,
         take: filters.limit,
       }),
@@ -76,22 +146,14 @@ export async function GET(request: NextRequest) {
       value: Number(deal.value),
     }));
 
-    return NextResponse.json({
-      success: true,
-      data: serializedDeals,
-      meta: {
-        page: filters.page,
-        limit: filters.limit,
-        total,
-        totalPages: Math.ceil(total / filters.limit),
-      },
+    return apiPaginated(serializedDeals, {
+      page: filters.page,
+      limit: filters.limit,
+      total,
     });
   } catch (error) {
     console.error("Error fetching deals:", error);
-    return NextResponse.json(
-      { success: false, error: { code: "FETCH_ERROR", message: "Failed to fetch deals" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "fetch", "Deal");
   }
 }
 
@@ -113,10 +175,7 @@ export async function POST(request: NextRequest) {
     // Get current business
     const business = await getCurrentBusiness(request);
     if (!business) {
-      return NextResponse.json(
-        { success: false, error: { code: "NO_BUSINESS", message: "No business selected" } },
-        { status: 400 }
-      );
+      return noBusinessError();
     }
 
     const deal = await prisma.deal.create({
@@ -148,15 +207,9 @@ export async function POST(request: NextRequest) {
       await triggerDealCreated(deal.contactId, deal.id, deal.title);
     }
 
-    return NextResponse.json(
-      { success: true, data: { ...deal, value: Number(deal.value) } },
-      { status: 201 }
-    );
+    return apiCreated({ ...deal, value: Number(deal.value) });
   } catch (error) {
     console.error("Error creating deal:", error);
-    return NextResponse.json(
-      { success: false, error: { code: "CREATE_ERROR", message: "Failed to create deal" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "create", "Deal");
   }
 }

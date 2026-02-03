@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { createCompanySchema, paginationSchema } from "@/lib/validations";
 import { Prisma } from "@prisma/client";
 import { getCurrentBusiness, buildBusinessScopeFilter } from "@/lib/business";
+import { handleApiError, noBusinessError } from "@/lib/api/errors";
+import { apiPaginated, apiCreated } from "@/lib/api/response";
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,22 +49,14 @@ export async function GET(request: NextRequest) {
       prisma.company.count({ where }),
     ]);
 
-    return NextResponse.json({
-      success: true,
-      data: companies,
-      meta: {
-        page: pagination.page,
-        limit: pagination.limit,
-        total,
-        totalPages: Math.ceil(total / pagination.limit),
-      },
+    return apiPaginated(companies, {
+      page: pagination.page,
+      limit: pagination.limit,
+      total,
     });
   } catch (error) {
     console.error("Error fetching companies:", error);
-    return NextResponse.json(
-      { success: false, error: { code: "FETCH_ERROR", message: "Failed to fetch companies" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "fetch", "Company");
   }
 }
 
@@ -74,10 +68,7 @@ export async function POST(request: NextRequest) {
     // Get current business
     const business = await getCurrentBusiness(request);
     if (!business) {
-      return NextResponse.json(
-        { success: false, error: { code: "NO_BUSINESS", message: "No business selected" } },
-        { status: 400 }
-      );
+      return noBusinessError();
     }
 
     const company = await prisma.company.create({
@@ -95,12 +86,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ success: true, data: company }, { status: 201 });
+    return apiCreated(company);
   } catch (error) {
     console.error("Error creating company:", error);
-    return NextResponse.json(
-      { success: false, error: { code: "CREATE_ERROR", message: "Failed to create company" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "create", "Company");
   }
 }

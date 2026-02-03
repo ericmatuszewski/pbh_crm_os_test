@@ -41,6 +41,8 @@ import {
   AlertCircle,
   Repeat,
   Loader2,
+  Link2,
+  Lock,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -50,6 +52,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Task, TaskStatus, Priority, User } from "@/types";
 import { format, isPast, isToday, isTomorrow } from "date-fns";
+
+// Extended task type with dependency info
+interface TaskWithDependency extends Task {
+  dependsOnId?: string | null;
+  dependsOn?: { id: string; title: string; status: TaskStatus } | null;
+  isRecurring?: boolean;
+  recurrencePattern?: string;
+  recurrenceInterval?: number;
+  recurrenceEndDate?: string;
+}
 
 const statusLabels: Record<TaskStatus, string> = {
   TODO: "To Do",
@@ -80,13 +92,13 @@ const priorityColors: Record<Priority, string> = {
 };
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<TaskWithDependency[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<TaskWithDependency | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -97,6 +109,7 @@ export default function TasksPage() {
     recurrencePattern: "" as string,
     recurrenceInterval: "1",
     recurrenceEndDate: "",
+    dependsOnId: "" as string,
   });
 
   useEffect(() => {
@@ -130,7 +143,7 @@ export default function TasksPage() {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const handleOpenForm = (task?: Task) => {
+  const handleOpenForm = (task?: TaskWithDependency) => {
     if (task) {
       setEditingTask(task);
       setFormData({
@@ -141,12 +154,13 @@ export default function TasksPage() {
           : "",
         priority: task.priority,
         status: task.status,
-        isRecurring: (task as Task & { isRecurring?: boolean }).isRecurring || false,
-        recurrencePattern: (task as Task & { recurrencePattern?: string }).recurrencePattern || "",
-        recurrenceInterval: String((task as Task & { recurrenceInterval?: number }).recurrenceInterval || 1),
-        recurrenceEndDate: (task as Task & { recurrenceEndDate?: string }).recurrenceEndDate
-          ? new Date((task as Task & { recurrenceEndDate: string }).recurrenceEndDate).toISOString().split("T")[0]
+        isRecurring: task.isRecurring || false,
+        recurrencePattern: task.recurrencePattern || "",
+        recurrenceInterval: String(task.recurrenceInterval || 1),
+        recurrenceEndDate: task.recurrenceEndDate
+          ? new Date(task.recurrenceEndDate).toISOString().split("T")[0]
           : "",
+        dependsOnId: task.dependsOnId || "",
       });
     } else {
       setEditingTask(null);
@@ -160,6 +174,7 @@ export default function TasksPage() {
         recurrencePattern: "",
         recurrenceInterval: "1",
         recurrenceEndDate: "",
+        dependsOnId: "",
       });
     }
     setIsFormOpen(true);
@@ -184,19 +199,25 @@ export default function TasksPage() {
           recurrencePattern: formData.isRecurring ? (formData.recurrencePattern || "daily") : null,
           recurrenceInterval: formData.isRecurring ? parseInt(formData.recurrenceInterval) || 1 : null,
           recurrenceEndDate: formData.isRecurring && formData.recurrenceEndDate ? formData.recurrenceEndDate : null,
+          dependsOnId: formData.dependsOnId || null,
         }),
       });
 
       if (res.ok) {
         fetchTasks();
         setIsFormOpen(false);
+      } else {
+        const data = await res.json();
+        if (data.error?.message) {
+          alert(data.error.message);
+        }
       }
     } catch (error) {
       console.error("Failed to save task:", error);
     }
   };
 
-  const handleToggleComplete = async (task: Task) => {
+  const handleToggleComplete = async (task: TaskWithDependency) => {
     const newStatus = task.status === "COMPLETED" ? "TODO" : "COMPLETED";
     try {
       const res = await fetch(`/api/tasks/${task.id}`, {
@@ -206,13 +227,18 @@ export default function TasksPage() {
       });
       if (res.ok) {
         fetchTasks();
+      } else {
+        const data = await res.json();
+        if (data.error?.message) {
+          alert(data.error.message);
+        }
       }
     } catch (error) {
       console.error("Failed to update task:", error);
     }
   };
 
-  const handleDelete = async (task: Task) => {
+  const handleDelete = async (task: TaskWithDependency) => {
     if (!window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
       return;
     }
@@ -221,6 +247,11 @@ export default function TasksPage() {
       const res = await fetch(`/api/tasks/${task.id}`, { method: "DELETE" });
       if (res.ok) {
         fetchTasks();
+      } else {
+        const data = await res.json();
+        if (data.error?.message) {
+          alert(data.error.message);
+        }
       }
     } catch (error) {
       console.error("Failed to delete task:", error);
@@ -339,16 +370,36 @@ export default function TasksPage() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <div
-                              className={`font-medium ${
-                                task.status === "COMPLETED" ? "line-through" : ""
-                              }`}
-                            >
-                              {task.title}
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`font-medium ${
+                                  task.status === "COMPLETED" ? "line-through" : ""
+                                }`}
+                              >
+                                {task.title}
+                              </span>
+                              {task.dependsOn && task.dependsOn.status !== "COMPLETED" && (
+                                <span
+                                  className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded"
+                                  title={`Blocked by: ${task.dependsOn.title}`}
+                                >
+                                  <Lock className="w-3 h-3" />
+                                  Blocked
+                                </span>
+                              )}
                             </div>
                             {task.description && (
                               <div className="text-sm text-gray-500 truncate max-w-md">
                                 {task.description}
+                              </div>
+                            )}
+                            {task.dependsOn && (
+                              <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                                <Link2 className="w-3 h-3" />
+                                Depends on: {task.dependsOn.title}
+                                {task.dependsOn.status === "COMPLETED" && (
+                                  <CheckSquare className="w-3 h-3 text-green-500" />
+                                )}
                               </div>
                             )}
                           </div>
@@ -505,6 +556,37 @@ export default function TasksPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Dependencies */}
+            <div className="space-y-2 pt-2 border-t">
+              <Label htmlFor="dependsOnId" className="flex items-center gap-1.5">
+                <Link2 className="w-4 h-4" />
+                Depends On (Blocking Task)
+              </Label>
+              <Select
+                value={formData.dependsOnId || "none"}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, dependsOnId: value === "none" ? "" : value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a blocking task" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No dependency</SelectItem>
+                  {tasks
+                    .filter(t => t.id !== editingTask?.id && t.status !== "COMPLETED")
+                    .map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.title}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                This task cannot be completed until the blocking task is done.
+              </p>
             </div>
 
             {/* Recurrence Settings */}

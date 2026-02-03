@@ -23,10 +23,13 @@ import {
   Zap,
   AtSign,
   AlertCircle,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useNotificationStream } from "@/hooks/useNotificationStream";
 
 interface Notification {
   id: string;
@@ -78,6 +81,50 @@ export function NotificationBell({ userId }: NotificationBellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Real-time notification stream
+  const {
+    isConnected,
+    unreadCount: streamUnreadCount,
+    lastNotification,
+  } = useNotificationStream({
+    enabled: !!userId,
+    onNotification: (notification) => {
+      // Add new notification to the top of the list
+      setNotifications((prev) => [
+        {
+          id: notification.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          priority: notification.priority,
+          entityType: null,
+          entityId: null,
+          link: notification.link || null,
+          fromUserName: null,
+          isRead: false,
+          createdAt: notification.createdAt,
+        },
+        ...prev.slice(0, 9), // Keep only 10 notifications
+      ]);
+
+      // Show toast for new notifications
+      toast(notification.title, {
+        description: notification.message,
+        action: notification.link
+          ? {
+              label: "View",
+              onClick: () => {
+                window.location.href = notification.link!;
+              },
+            }
+          : undefined,
+      });
+    },
+    onCountUpdate: (count) => {
+      setStats((prev) => ({ ...prev, unread: count }));
+    },
+  });
+
   const fetchNotifications = useCallback(async () => {
     if (!userId) return;
 
@@ -97,12 +144,16 @@ export function NotificationBell({ userId }: NotificationBellProps) {
     }
   }, [userId]);
 
+  // Initial fetch and fallback polling (only when not connected to stream)
   useEffect(() => {
     fetchNotifications();
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
+
+    // Only poll if not connected to real-time stream
+    if (!isConnected) {
+      const interval = setInterval(fetchNotifications, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [fetchNotifications, isConnected]);
 
   const markAsRead = async (ids: string[]) => {
     try {
@@ -171,9 +222,17 @@ export function NotificationBell({ userId }: NotificationBellProps) {
       <PopoverContent align="end" className="w-96 p-0">
         <div className="flex items-center justify-between p-4 border-b">
           <div>
-            <h4 className="font-semibold">Notifications</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="font-semibold">Notifications</h4>
+              {isConnected ? (
+                <Wifi className="h-3 w-3 text-green-500" />
+              ) : (
+                <WifiOff className="h-3 w-3 text-muted-foreground" />
+              )}
+            </div>
             <p className="text-xs text-muted-foreground">
               {stats.unread} unread
+              {!isConnected && " • Polling"}
             </p>
           </div>
           <div className="flex items-center gap-2">

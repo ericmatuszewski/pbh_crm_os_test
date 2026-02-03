@@ -1,43 +1,91 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { updateTaskSchema } from "@/lib/validations";
+import { handleApiError, notFoundError, validationError } from "@/lib/api/errors";
+import { apiSuccess, apiDeleted } from "@/lib/api/response";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
     const task = await prisma.task.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         assignee: { select: { id: true, name: true, email: true, image: true } },
       },
     });
 
     if (!task) {
-      return NextResponse.json(
-        { success: false, error: { code: "NOT_FOUND", message: "Task not found" } },
-        { status: 404 }
-      );
+      return notFoundError("Task");
     }
 
-    return NextResponse.json({ success: true, data: task });
+    // Fetch dependency if exists
+    let dependsOn = null;
+    if (task.dependsOnId) {
+      dependsOn = await prisma.task.findUnique({
+        where: { id: task.dependsOnId },
+        select: { id: true, title: true, status: true },
+      });
+    }
+
+    return apiSuccess({ ...task, dependsOn });
   } catch (error) {
     console.error("Error fetching task:", error);
-    return NextResponse.json(
-      { success: false, error: { code: "FETCH_ERROR", message: "Failed to fetch task" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "fetch", "Task");
   }
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const data = updateTaskSchema.parse(body);
+
+    // Check if trying to complete a task that has an incomplete dependency
+    if (data.status === "COMPLETED") {
+      const existingTask = await prisma.task.findUnique({
+        where: { id },
+        select: { dependsOnId: true },
+      });
+
+      if (existingTask?.dependsOnId) {
+        const dependency = await prisma.task.findUnique({
+          where: { id: existingTask.dependsOnId },
+          select: { status: true, title: true },
+        });
+
+        if (dependency && dependency.status !== "COMPLETED") {
+          return validationError(
+            `Cannot complete this task until "${dependency.title}" is completed`,
+            { blockedBy: existingTask.dependsOnId }
+          );
+        }
+      }
+    }
+
+    // Prevent circular dependencies
+    if (data.dependsOnId) {
+      // Check if the target task depends on this task (direct circular)
+      const targetTask = await prisma.task.findUnique({
+        where: { id: data.dependsOnId },
+        select: { dependsOnId: true },
+      });
+
+      if (targetTask?.dependsOnId === id) {
+        return validationError("Circular dependency detected");
+      }
+
+      // Prevent self-dependency
+      if (data.dependsOnId === id) {
+        return validationError("A task cannot depend on itself");
+      }
+    }
 
     const updateData: Record<string, unknown> = {};
 
@@ -49,40 +97,65 @@ export async function PUT(
     if (data.priority) updateData.priority = data.priority;
     if (data.status) updateData.status = data.status;
     if (data.assigneeId) updateData.assigneeId = data.assigneeId;
+    if (data.dependsOnId !== undefined) updateData.dependsOnId = data.dependsOnId || null;
+    if (data.isRecurring !== undefined) updateData.isRecurring = data.isRecurring;
+    if (data.recurrencePattern !== undefined) updateData.recurrencePattern = data.recurrencePattern || null;
+    if (data.recurrenceInterval !== undefined) updateData.recurrenceInterval = data.recurrenceInterval || null;
+    if (data.recurrenceEndDate !== undefined) {
+      updateData.recurrenceEndDate = data.recurrenceEndDate ? new Date(data.recurrenceEndDate) : null;
+    }
 
     const task = await prisma.task.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         assignee: { select: { id: true, name: true, email: true } },
       },
     });
 
-    return NextResponse.json({ success: true, data: task });
+    // Fetch dependency if exists
+    let dependsOn = null;
+    if (task.dependsOnId) {
+      dependsOn = await prisma.task.findUnique({
+        where: { id: task.dependsOnId },
+        select: { id: true, title: true, status: true },
+      });
+    }
+
+    return apiSuccess({ ...task, dependsOn });
   } catch (error) {
     console.error("Error updating task:", error);
-    return NextResponse.json(
-      { success: false, error: { code: "UPDATE_ERROR", message: "Failed to update task" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "update", "Task");
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await prisma.task.delete({
-      where: { id: params.id },
+    const { id } = await params;
+
+    // Check if any tasks depend on this one
+    const dependentTasks = await prisma.task.findMany({
+      where: { dependsOnId: id },
+      select: { id: true, title: true },
     });
 
-    return NextResponse.json({ success: true, data: null });
+    if (dependentTasks.length > 0) {
+      return validationError(
+        `Cannot delete this task. ${dependentTasks.length} task(s) depend on it.`,
+        { dependentTasks: dependentTasks.map(t => t.title) }
+      );
+    }
+
+    await prisma.task.delete({
+      where: { id },
+    });
+
+    return apiDeleted(id);
   } catch (error) {
     console.error("Error deleting task:", error);
-    return NextResponse.json(
-      { success: false, error: { code: "DELETE_ERROR", message: "Failed to delete task" } },
-      { status: 500 }
-    );
+    return handleApiError(error, "delete", "Task");
   }
 }
