@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
         id: email.id,
         type: "email",
         title: email.subject,
-        description: `Email to ${email.toEmail}`,
-        timestamp: email.sentAt,
+        description: `Email to ${email.toEmails.join(", ")}`,
+        timestamp: email.sentAt || email.receivedAt || email.createdAt,
         metadata: { status: email.status, source: email.source },
       });
     });

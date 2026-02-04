@@ -1,0 +1,459 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CRM API",
+    "description": "Enterprise CRM REST API for managing contacts, companies, deals, quotes, and workflows.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support",
+      "email": "api@example.com"
+    },
+    "license": {
+      "name": "Proprietary"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "API Base URL"
+    }
+  ],
+  "tags": [
+    { "name": "Contacts", "description": "Contact management" },
+    { "name": "Companies", "description": "Company management" },
+    { "name": "Deals", "description": "Deal management" },
+    { "name": "Quotes", "description": "Quote management" },
+    { "name": "Products", "description": "Product catalog" },
+    { "name": "Tasks", "description": "Task management" },
+    { "name": "Activities", "description": "Activity tracking" },
+    { "name": "Workflows", "description": "Workflow automation" },
+    { "name": "Webhooks", "description": "Webhook subscriptions" },
+    { "name": "Users", "description": "User management" }
+  ],
+  "paths": {
+    "/contacts": {
+      "get": {
+        "tags": ["Contacts"],
+        "summary": "List contacts",
+        "operationId": "listContacts",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "maximum": 100 } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["LEAD", "QUALIFIED", "CUSTOMER", "INACTIVE"] } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "companyId", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of contacts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Contact" } },
+                    "pagination": { "$ref": "#/components/schemas/Pagination" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["contacts:read"] }]
+      },
+      "post": {
+        "tags": ["Contacts"],
+        "summary": "Create a contact",
+        "operationId": "createContact",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContactInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Contact created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/Contact" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["contacts:write"] }]
+      }
+    },
+    "/contacts/{id}": {
+      "get": {
+        "tags": ["Contacts"],
+        "summary": "Get a contact by ID",
+        "operationId": "getContact",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contact details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/Contact" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["contacts:read"] }]
+      },
+      "put": {
+        "tags": ["Contacts"],
+        "summary": "Update a contact",
+        "operationId": "updateContact",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ContactInput" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contact updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/Contact" }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["contacts:write"] }]
+      },
+      "delete": {
+        "tags": ["Contacts"],
+        "summary": "Delete a contact",
+        "operationId": "deleteContact",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Contact deleted" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["contacts:delete"] }]
+      }
+    },
+    "/companies": {
+      "get": {
+        "tags": ["Companies"],
+        "summary": "List companies",
+        "operationId": "listCompanies",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of companies" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["companies:read"] }]
+      },
+      "post": {
+        "tags": ["Companies"],
+        "summary": "Create a company",
+        "operationId": "createCompany",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompanyInput" } } }
+        },
+        "responses": {
+          "201": { "description": "Company created" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["companies:write"] }]
+      }
+    },
+    "/deals": {
+      "get": {
+        "tags": ["Deals"],
+        "summary": "List deals",
+        "operationId": "listDeals",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
+          { "name": "stage", "in": "query", "schema": { "type": "string" } },
+          { "name": "pipelineId", "in": "query", "schema": { "type": "string" } },
+          { "name": "ownerId", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "List of deals" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["deals:read"] }]
+      },
+      "post": {
+        "tags": ["Deals"],
+        "summary": "Create a deal",
+        "operationId": "createDeal",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DealInput" } } }
+        },
+        "responses": {
+          "201": { "description": "Deal created" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["deals:write"] }]
+      }
+    },
+    "/quotes": {
+      "get": {
+        "tags": ["Quotes"],
+        "summary": "List quotes",
+        "operationId": "listQuotes",
+        "responses": {
+          "200": { "description": "List of quotes" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["quotes:read"] }]
+      },
+      "post": {
+        "tags": ["Quotes"],
+        "summary": "Create a quote",
+        "operationId": "createQuote",
+        "responses": {
+          "201": { "description": "Quote created" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["quotes:write"] }]
+      }
+    },
+    "/products": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "List products",
+        "operationId": "listProducts",
+        "responses": {
+          "200": { "description": "List of products" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["products:read"] }]
+      }
+    },
+    "/workflows": {
+      "get": {
+        "tags": ["Workflows"],
+        "summary": "List workflows",
+        "operationId": "listWorkflows",
+        "responses": {
+          "200": { "description": "List of workflows" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["workflows:read"] }]
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "tags": ["Webhooks"],
+        "summary": "List webhook subscriptions",
+        "operationId": "listWebhooks",
+        "responses": {
+          "200": { "description": "List of webhooks" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["webhooks:read"] }]
+      },
+      "post": {
+        "tags": ["Webhooks"],
+        "summary": "Create a webhook subscription",
+        "operationId": "createWebhook",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WebhookInput" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Webhook created" }
+        },
+        "security": [{ "ApiKey": [] }, { "OAuth2": ["webhooks:write"] }]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "phone": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "string", "enum": ["LEAD", "QUALIFIED", "CUSTOMER", "INACTIVE"] },
+          "leadScore": { "type": "integer" },
+          "companyId": { "type": "string" },
+          "ownerId": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ContactInput": {
+        "type": "object",
+        "required": ["firstName", "lastName"],
+        "properties": {
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "phone": { "type": "string" },
+          "title": { "type": "string" },
+          "companyId": { "type": "string" },
+          "status": { "type": "string", "enum": ["LEAD", "QUALIFIED", "CUSTOMER", "INACTIVE"] }
+        }
+      },
+      "CompanyInput": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "website": { "type": "string" },
+          "industry": { "type": "string" },
+          "phone": { "type": "string" },
+          "address": { "type": "string" }
+        }
+      },
+      "DealInput": {
+        "type": "object",
+        "required": ["title", "value"],
+        "properties": {
+          "title": { "type": "string" },
+          "value": { "type": "number" },
+          "currency": { "type": "string", "default": "GBP" },
+          "contactId": { "type": "string" },
+          "companyId": { "type": "string" },
+          "pipelineId": { "type": "string" },
+          "stageId": { "type": "string" },
+          "expectedCloseDate": { "type": "string", "format": "date" }
+        }
+      },
+      "WebhookInput": {
+        "type": "object",
+        "required": ["name", "url", "events"],
+        "properties": {
+          "name": { "type": "string" },
+          "url": { "type": "string", "format": "uri" },
+          "events": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Events to subscribe to (e.g., 'contact.created', 'deal.updated')"
+          },
+          "secret": { "type": "string", "description": "Secret for payload signing" },
+          "headers": { "type": "object", "additionalProperties": { "type": "string" } }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer" },
+          "limit": { "type": "integer" },
+          "total": { "type": "integer" },
+          "totalPages": { "type": "integer" }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication required",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid request",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key for authentication"
+      },
+      "OAuth2": {
+        "type": "oauth2",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "/api/oauth/authorize",
+            "tokenUrl": "/api/oauth/token",
+            "scopes": {
+              "contacts:read": "Read contacts",
+              "contacts:write": "Create and update contacts",
+              "contacts:delete": "Delete contacts",
+              "companies:read": "Read companies",
+              "companies:write": "Create and update companies",
+              "deals:read": "Read deals",
+              "deals:write": "Create and update deals",
+              "quotes:read": "Read quotes",
+              "quotes:write": "Create and update quotes",
+              "products:read": "Read products",
+              "workflows:read": "Read workflows",
+              "webhooks:read": "Read webhooks",
+              "webhooks:write": "Create and update webhooks"
+            }
+          }
+        }
+      }
+    }
+  }
+}

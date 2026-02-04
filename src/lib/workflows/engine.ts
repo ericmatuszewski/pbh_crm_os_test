@@ -301,13 +301,15 @@ async function executeAction(
     switch (action.type) {
       case ActionType.SEND_EMAIL:
         // Log email to be sent (actual sending would require email service)
+        const recipientEmail = getFieldValue(context.entity, String(config.toField || "email"));
         await prisma.emailLog.create({
           data: {
             subject: processTemplate(String(config.subject || "Workflow Email"), context.entity),
             body: processTemplate(String(config.body || ""), context.entity),
             fromEmail: "workflow@system.local",
-            toEmail: getFieldValue(context.entity, String(config.toField || "email")),
+            toEmails: recipientEmail ? [recipientEmail] : [],
             source: "workflow",
+            sentAt: new Date(),
             contactId: context.entityType === "contacts" ? context.entityId : null,
             dealId: context.entityType === "deals" ? context.entityId : null,
           },

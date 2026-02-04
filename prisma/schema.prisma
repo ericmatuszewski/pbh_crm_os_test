@@ -236,6 +236,7 @@ model User {
   documentsUploaded Document[] @relation("DocumentsUploaded")
   documentTemplatesCreated DocumentTemplate[] @relation("DocumentTemplatesCreated")
   backgroundJobs BackgroundJob[]
+  emailLogs      EmailLog[]   // CRM email logs
 
   // Team management relations
   teamsOwned    Team[]     @relation("TeamOwner")
@@ -459,6 +460,7 @@ model Business {
   microsoftCredentials  MicrosoftCredential[]
   microsoftMailboxes    MicrosoftMailbox[]
   emails                Email[]
+  emailLogs             EmailLog[]   // CRM email logs
 
   // User Management Relations
   teams                 Team[]
@@ -520,6 +522,7 @@ model Contact {
   callQueueItems CallQueueItem[]
   meetings   Meeting[]
   emails     Email[]       // Microsoft Graph emails linked to this contact
+  emailLogs  EmailLog[]    // CRM email logs
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
@@ -589,6 +592,7 @@ model Deal {
   quotes            Quote[]
   meetings          Meeting[]
   emails            Email[]        // Microsoft Graph emails linked to this deal
+  emailLogs         EmailLog[]     // CRM email logs
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
@@ -747,6 +751,17 @@ model Quote {
   // For auto-converting to deals
   convertedToDealId String?   @unique
 
+  // E-Signature integration
+  signatureRequestId  String?     // External envelope/request ID from DocuSign/HelloSign
+  signatureProvider   String?     // "docusign", "hellosign", "pandadoc"
+  signatureStatus     String?     // PENDING, SENT, VIEWED, SIGNED, DECLINED, VOIDED
+  signatureUpdatedAt  DateTime?
+  signedAt            DateTime?
+  signedByEmail       String?
+  signedByName        String?
+  rejectedAt          DateTime?
+  rejectionReason     String?
+
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   sentAt          DateTime?
@@ -761,6 +776,7 @@ model Quote {
   @@index([createdById])
   @@index([templateId])
   @@index([businessId])
+  @@index([signatureRequestId])
 }
 
 model QuoteItem {
@@ -793,6 +809,14 @@ model ScheduledCall {
   status          ScheduledCallStatus @default(SCHEDULED)
   outcome         CallOutcome?
   notes           String?             @db.Text
+
+  // Call recording & transcription
+  recordingUrl    String?             // URL to call recording file
+  recordingDuration Int?              // Recording duration in seconds
+  transcriptUrl   String?             // URL to transcript file
+  transcriptText  String?             @db.Text // Full transcript text
+  transcriptStatus String?            // PENDING, PROCESSING, COMPLETED, FAILED
+  transcriptProvider String?          // Service used: "assembly-ai", "deepgram", "rev", etc.
 
   // Multi-business support
   businessId      String?
@@ -1409,23 +1433,39 @@ model EmailLog {
   subject         String
   body            String   @db.Text
   fromEmail       String
-  toEmail         String
+  fromName        String?
+  toEmails        String[] @default([])
   ccEmails        String[] @default([])
   bccEmails       String[] @default([])
+  direction       String   @default("OUTBOUND") // INBOUND, OUTBOUND
+
+  // Email threading
+  messageId       String?  // Email Message-ID header
+  inReplyTo       String?  // In-Reply-To header for threading
+  threadId        String?  // Thread grouping ID
 
   // Tracking
-  status          String   @default("sent") // sent, delivered, opened, clicked, bounced, failed
-  sentAt          DateTime @default(now())
+  status          String   @default("SENT") // SENT, DELIVERED, OPENED, CLICKED, BOUNCED, FAILED, RECEIVED
+  sentAt          DateTime?
+  receivedAt      DateTime?
   openedAt        DateTime?
   clickedAt       DateTime?
 
   // Source - how was this logged
   source          String   @default("manual") // manual, bcc-dropbox, integration, template
+  provider        String?  // sendgrid, mailgun, postmark, etc.
+
+  // Multi-business support
+  businessId      String?
+  business        Business? @relation(fields: [businessId], references: [id])
 
   // Relations
   contactId       String?
+  contact         Contact?  @relation(fields: [contactId], references: [id])
   dealId          String?
+  deal            Deal?     @relation(fields: [dealId], references: [id])
   userId          String?
+  user            User?     @relation(fields: [userId], references: [id])
 
   // Template used (if any)
   templateId      String?
@@ -1436,6 +1476,9 @@ model EmailLog {
   @@index([dealId])
   @@index([userId])
   @@index([sentAt])
+  @@index([businessId])
+  @@index([messageId])
+  @@index([threadId])
 }
 
 // ==================== MEETING SCHEDULER ====================
