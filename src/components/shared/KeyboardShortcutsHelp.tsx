@@ -6,8 +6,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { KeyboardShortcut, formatShortcut } from "@/hooks/useKeyboardShortcuts";
+import { Badge } from "@/components/ui/badge";
 import { Keyboard } from "lucide-react";
+import { KeyboardShortcut, formatShortcut } from "@/hooks/useKeyboardShortcuts";
 
 interface KeyboardShortcutsHelpProps {
   open: boolean;
@@ -32,6 +33,11 @@ export function KeyboardShortcutsHelp({
     return acc;
   }, {} as Record<string, KeyboardShortcut[]>);
 
+  const categoryOrder = ["Outcomes", "Actions", "Navigation", "Help", "General"];
+  const sortedCategories = Object.keys(groupedShortcuts).sort(
+    (a, b) => categoryOrder.indexOf(a) - categoryOrder.indexOf(b)
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -41,30 +47,30 @@ export function KeyboardShortcutsHelp({
             {title}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          {Object.entries(groupedShortcuts).map(([category, categoryShortcuts]) => (
+        <div className="space-y-4 py-2">
+          {sortedCategories.map((category) => (
             <div key={category}>
               <h4 className="text-sm font-medium text-muted-foreground mb-2">
                 {category}
               </h4>
               <div className="space-y-1">
-                {categoryShortcuts.map((shortcut, index) => (
+                {groupedShortcuts[category].map((shortcut, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-slate-50"
+                    className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50"
                   >
                     <span className="text-sm">{shortcut.description}</span>
-                    <kbd className="px-2 py-1 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded">
+                    <Badge variant="outline" className="font-mono text-xs">
                       {formatShortcut(shortcut)}
-                    </kbd>
+                    </Badge>
                   </div>
                 ))}
               </div>
             </div>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground text-center mt-4">
-          Press <kbd className="px-1.5 py-0.5 text-xs bg-slate-100 border rounded">Esc</kbd> to close
+        <p className="text-xs text-muted-foreground text-center pt-2 border-t">
+          Press <Badge variant="outline" className="font-mono text-xs mx-1">?</Badge> anytime to show this help
         </p>
       </DialogContent>
     </Dialog>

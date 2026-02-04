@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useRef } from "react";
 
 export interface KeyboardShortcut {
   key: string;
@@ -14,93 +14,70 @@ export interface KeyboardShortcut {
 
 interface UseKeyboardShortcutsOptions {
   enabled?: boolean;
-  preventDefault?: boolean;
+  ignoreInputs?: boolean;
 }
 
-/**
- * Hook for registering keyboard shortcuts
- *
- * @param shortcuts - Array of shortcut definitions
- * @param options - Configuration options
- *
- * @example
- * ```tsx
- * useKeyboardShortcuts([
- *   { key: "1", action: () => handleOutcome("ANSWERED"), description: "Mark as Answered" },
- *   { key: "n", action: fetchNextContact, description: "Next contact" },
- *   { key: "?", action: toggleHelp, description: "Show shortcuts" },
- * ]);
- * ```
- */
 export function useKeyboardShortcuts(
   shortcuts: KeyboardShortcut[],
   options: UseKeyboardShortcutsOptions = {}
 ) {
-  const { enabled = true, preventDefault = true } = options;
+  const { enabled = true, ignoreInputs = true } = options;
+  const shortcutsRef = useRef(shortcuts);
+  shortcutsRef.current = shortcuts;
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      // Don't trigger shortcuts when typing in inputs
-      const target = event.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.tagName === "SELECT" ||
-        target.isContentEditable
-      ) {
-        return;
+      if (!enabled) return;
+
+      // Ignore if typing in an input, textarea, or contenteditable
+      if (ignoreInputs) {
+        const target = event.target as HTMLElement;
+        const tagName = target.tagName.toLowerCase();
+        if (
+          tagName === "input" ||
+          tagName === "textarea" ||
+          tagName === "select" ||
+          target.isContentEditable
+        ) {
+          return;
+        }
       }
 
-      for (const shortcut of shortcuts) {
-        const keyMatch = event.key.toLowerCase() === shortcut.key.toLowerCase();
-        const ctrlMatch = shortcut.ctrl ? (event.ctrlKey || event.metaKey) : !event.ctrlKey && !event.metaKey;
-        const shiftMatch = shortcut.shift ? event.shiftKey : !event.shiftKey;
-        const altMatch = shortcut.alt ? event.altKey : !event.altKey;
+      const key = event.key.toLowerCase();
 
-        if (keyMatch && ctrlMatch && shiftMatch && altMatch) {
-          if (preventDefault) {
-            event.preventDefault();
-          }
+      for (const shortcut of shortcutsRef.current) {
+        const matchesKey = shortcut.key.toLowerCase() === key;
+        const matchesCtrl = shortcut.ctrl ? event.ctrlKey || event.metaKey : !event.ctrlKey && !event.metaKey;
+        const matchesShift = shortcut.shift ? event.shiftKey : !event.shiftKey;
+        const matchesAlt = shortcut.alt ? event.altKey : !event.altKey;
+
+        if (matchesKey && matchesCtrl && matchesShift && matchesAlt) {
+          event.preventDefault();
           shortcut.action();
           return;
         }
       }
     },
-    [shortcuts, preventDefault]
+    [enabled, ignoreInputs]
   );
 
   useEffect(() => {
-    if (!enabled) return;
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    if (enabled) {
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }
   }, [enabled, handleKeyDown]);
+
+  return shortcutsRef.current;
 }
 
-/**
- * Format a shortcut for display
- */
+// Format shortcut for display
 export function formatShortcut(shortcut: KeyboardShortcut): string {
   const parts: string[] = [];
-
-  if (shortcut.ctrl) {
-    parts.push(navigator.platform.includes("Mac") ? "Cmd" : "Ctrl");
-  }
-  if (shortcut.alt) {
-    parts.push(navigator.platform.includes("Mac") ? "Option" : "Alt");
-  }
-  if (shortcut.shift) {
-    parts.push("Shift");
-  }
-
-  // Format the key nicely
-  let keyDisplay = shortcut.key;
-  if (shortcut.key === " ") keyDisplay = "Space";
-  else if (shortcut.key === "Escape") keyDisplay = "Esc";
-  else if (shortcut.key.length === 1) keyDisplay = shortcut.key.toUpperCase();
-
-  parts.push(keyDisplay);
-
+  if (shortcut.ctrl) parts.push("Ctrl");
+  if (shortcut.alt) parts.push("Alt");
+  if (shortcut.shift) parts.push("Shift");
+  parts.push(shortcut.key.toUpperCase());
   return parts.join(" + ");
 }
 
