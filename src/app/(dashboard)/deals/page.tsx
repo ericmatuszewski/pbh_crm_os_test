@@ -23,6 +23,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DealTable, DealKanban, PipelineAnalytics } from "@/components/deals";
 import { StageConfig } from "@/components/deals/DealKanban";
 import { EmptyState, LoadingState } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { HelpTooltip } from "@/components/accessible/Tooltip";
 import { Plus, Target, Search, LayoutGrid, List, BarChart3, Settings2, Loader2 } from "lucide-react";
 import { Deal, DealStage, Pipeline } from "@/types";
 import Link from "next/link";
@@ -61,6 +72,8 @@ function DealsPageContent() {
   const viewMode = filters.view as "table" | "kanban" | "analytics";
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [dealToDelete, setDealToDelete] = useState<Deal | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     value: "",
@@ -218,16 +231,22 @@ function DealsPageContent() {
     }
   };
 
-  const handleDelete = async (deal: Deal) => {
-    if (!window.confirm(`Are you sure you want to delete "${deal.title}"?`)) {
-      return;
-    }
+  const handleDeleteClick = (deal: Deal) => {
+    setDealToDelete(deal);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!dealToDelete) return;
 
     try {
-      await deleteMutation.mutateAsync(deal.id);
+      await deleteMutation.mutateAsync(dealToDelete.id);
       toast.success("Deal deleted successfully");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete deal");
+    } finally {
+      setDeleteDialogOpen(false);
+      setDealToDelete(null);
     }
   };
 
@@ -361,7 +380,7 @@ function DealsPageContent() {
                 <DealKanban
                   deals={filteredDeals}
                   onEdit={handleOpenForm}
-                  onDelete={handleDelete}
+                  onDelete={handleDeleteClick}
                   onStageChange={handleStageDrop}
                   stages={pipelineStages.length > 0 ? pipelineStages : undefined}
                 />
@@ -369,7 +388,7 @@ function DealsPageContent() {
                 <DealTable
                   deals={filteredDeals}
                   onEdit={handleOpenForm}
-                  onDelete={handleDelete}
+                  onDelete={handleDeleteClick}
                 />
               )
             ) : (
@@ -479,7 +498,13 @@ function DealsPageContent() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="probability">Win Probability (%)</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="probability">Win Probability (%)</Label>
+                  <HelpTooltip
+                    content="Your estimated likelihood of closing this deal. Used for weighted pipeline forecasting."
+                    iconSize="sm"
+                  />
+                </div>
                 <Input
                   id="probability"
                   type="number"
@@ -568,6 +593,27 @@ function DealsPageContent() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Deal</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{dealToDelete?.title}&rdquo;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDealToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

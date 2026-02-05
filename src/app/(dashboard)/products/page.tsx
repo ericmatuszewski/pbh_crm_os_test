@@ -38,7 +38,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/shared";
+import { EmptyState, LoadingState } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { HelpTooltip } from "@/components/accessible/Tooltip";
 import { Plus, Package, Search, MoreVertical, Edit, Trash2, Eye, Folder, Tags, BookOpen } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
@@ -87,6 +98,8 @@ export default function ProductsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [formData, setFormData] = useState({
     sku: "",
     name: "",
@@ -200,18 +213,24 @@ export default function ProductsPage() {
     }
   };
 
-  const handleDelete = async (product: Product) => {
-    if (!window.confirm(`Are you sure you want to delete "${product.name}"?`)) {
-      return;
-    }
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return;
 
     try {
-      const res = await fetch(`/api/products/${product.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/products/${productToDelete.id}`, { method: "DELETE" });
       if (res.ok) {
         fetchProducts();
       }
     } catch (error) {
       console.error("Failed to delete product:", error);
+    } finally {
+      setDeleteDialogOpen(false);
+      setProductToDelete(null);
     }
   };
 
@@ -298,8 +317,8 @@ export default function ProductsPage() {
 
             {/* Products Table */}
             {loading ? (
-              <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
-                Loading...
+              <div className="bg-white rounded-lg border p-8">
+                <LoadingState message="Loading products..." />
               </div>
             ) : filteredProducts.length > 0 ? (
               <div className="bg-white rounded-lg border">
@@ -370,7 +389,7 @@ export default function ProductsPage() {
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 className="text-destructive"
-                                onClick={() => handleDelete(product)}
+                                onClick={() => handleDeleteClick(product)}
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Delete
@@ -416,7 +435,13 @@ export default function ProductsPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="sku">SKU *</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="sku">SKU *</Label>
+                  <HelpTooltip
+                    content="Stock Keeping Unit - a unique identifier like PRD-001 or SOFT-2024-001"
+                    iconSize="sm"
+                  />
+                </div>
                 <Input
                   id="sku"
                   value={formData.sku}
@@ -426,7 +451,13 @@ export default function ProductsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="type">Type</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="type">Type</Label>
+                  <HelpTooltip
+                    content="Product is physical goods, Service is professional work, Subscription has recurring billing"
+                    iconSize="sm"
+                  />
+                </div>
                 <Select
                   value={formData.type}
                   onValueChange={(value) =>
@@ -501,7 +532,13 @@ export default function ProductsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="pricingType">Pricing Type</Label>
+                <div className="flex items-center gap-1">
+                  <Label htmlFor="pricingType">Pricing Type</Label>
+                  <HelpTooltip
+                    content="One-time is single purchase, Monthly/Yearly is recurring subscription, Usage-based charges per use"
+                    iconSize="sm"
+                  />
+                </div>
                 <Select
                   value={formData.pricingType}
                   onValueChange={(value) =>
@@ -564,6 +601,27 @@ export default function ProductsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{productToDelete?.name}&rdquo;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

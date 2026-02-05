@@ -1,12 +1,22 @@
 "use client";
 
-import { Suspense, useRef, useEffect } from "react";
+import { Suspense, useRef, useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QuoteTable } from "@/components/quotes";
 import { EmptyState, LoadingState } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, FileText, Search } from "lucide-react";
 import { Quote } from "@/types";
 import { useBusiness } from "@/contexts/BusinessContext";
@@ -33,17 +43,25 @@ function QuotesPageContent() {
 
   const deleteMutation = useDeleteQuote();
   const statusMutation = useUpdateQuoteStatus();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [quoteToDelete, setQuoteToDelete] = useState<Quote | null>(null);
 
-  const handleDelete = async (quote: Quote) => {
-    if (!confirm(`Are you sure you want to delete quote ${quote.quoteNumber}?`)) {
-      return;
-    }
+  const handleDeleteClick = (quote: Quote) => {
+    setQuoteToDelete(quote);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!quoteToDelete) return;
 
     try {
-      await deleteMutation.mutateAsync(quote.id);
+      await deleteMutation.mutateAsync(quoteToDelete.id);
       toast.success("Quote deleted successfully");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete quote");
+    } finally {
+      setDeleteDialogOpen(false);
+      setQuoteToDelete(null);
     }
   };
 
@@ -112,7 +130,7 @@ function QuotesPageContent() {
             ) : filteredQuotes.length > 0 ? (
               <QuoteTable
                 quotes={filteredQuotes}
-                onDelete={handleDelete}
+                onDelete={handleDeleteClick}
                 onSend={handleSend}
                 onDownload={handleDownload}
               />
@@ -140,6 +158,27 @@ function QuotesPageContent() {
           </div>
         </main>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Quote</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete quote &ldquo;{quoteToDelete?.quoteNumber}&rdquo;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setQuoteToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

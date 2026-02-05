@@ -29,7 +29,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/shared";
+import { EmptyState, LoadingState } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { HelpTooltip } from "@/components/accessible/Tooltip";
 import {
   Plus,
   CheckSquare,
@@ -99,6 +110,8 @@ export default function TasksPage() {
   const [priorityFilter, setPriorityFilter] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskWithDependency | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<TaskWithDependency | null>(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -238,13 +251,16 @@ export default function TasksPage() {
     }
   };
 
-  const handleDelete = async (task: TaskWithDependency) => {
-    if (!window.confirm(`Are you sure you want to delete "${task.title}"?`)) {
-      return;
-    }
+  const handleDeleteClick = (task: TaskWithDependency) => {
+    setTaskToDelete(task);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!taskToDelete) return;
 
     try {
-      const res = await fetch(`/api/tasks/${task.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/tasks/${taskToDelete.id}`, { method: "DELETE" });
       if (res.ok) {
         fetchTasks();
       } else {
@@ -255,6 +271,9 @@ export default function TasksPage() {
       }
     } catch (error) {
       console.error("Failed to delete task:", error);
+    } finally {
+      setDeleteDialogOpen(false);
+      setTaskToDelete(null);
     }
   };
 
@@ -340,8 +359,8 @@ export default function TasksPage() {
 
             {/* Task List */}
             {loading ? (
-              <div className="bg-white rounded-lg border p-8 text-center text-gray-500">
-                Loading...
+              <div className="bg-white rounded-lg border p-8">
+                <LoadingState message="Loading tasks..." />
               </div>
             ) : filteredTasks.length > 0 ? (
               <div className="bg-white rounded-lg border">
@@ -433,7 +452,7 @@ export default function TasksPage() {
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => handleDelete(task)}
+                                onClick={() => handleDeleteClick(task)}
                                 className="text-red-600"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
@@ -603,6 +622,10 @@ export default function TasksPage() {
                   <Repeat className="w-4 h-4" />
                   Recurring Task
                 </Label>
+                <HelpTooltip
+                  content="Recurring tasks automatically create a new instance when completed, great for regular follow-ups"
+                  iconSize="sm"
+                />
               </div>
 
               {formData.isRecurring && (
@@ -670,6 +693,27 @@ export default function TasksPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{taskToDelete?.title}&rdquo;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTaskToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
