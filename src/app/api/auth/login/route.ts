@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
 import { authenticateAD, isLDAPConfigured } from "@/lib/auth/ldap";
-import { createUserSession, parseUserAgent } from "@/lib/sessions/service";
+import { createSessionWithLimitEnforcement, parseUserAgent } from "@/lib/sessions/service";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -119,6 +119,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check MFA status
+    const userMfa = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { mfaEnabled: true },
+    });
+
     // Generate session token
     const sessionToken = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
@@ -129,14 +135,33 @@ export async function POST(request: NextRequest) {
       || request.headers.get("x-real-ip")
       || "unknown";
 
-    // Create session
-    await createUserSession(
+    // Check if user has MFA enabled
+    if (userMfa?.mfaEnabled) {
+      // Return partial response requiring MFA verification
+      // Store pending session info temporarily (could use Redis in production)
+      return NextResponse.json({
+        success: true,
+        data: {
+          requiresMfa: true,
+          userId: user.id,
+          message: "MFA verification required",
+        },
+      });
+    }
+
+    // Create session with limit enforcement (revokes oldest if over limit)
+    const { enforcementResult } = await createSessionWithLimitEnforcement(
       sessionToken,
       user.id,
       userAgent,
       { ipAddress },
       expiresAt
     );
+
+    // Log if sessions were revoked due to limit
+    if (enforcementResult.revokedCount > 0) {
+      console.log(`Session limit enforced for user ${user.id}: ${enforcementResult.revokedCount} sessions revoked`);
+    }
 
     // Update user last login
     await prisma.user.update({

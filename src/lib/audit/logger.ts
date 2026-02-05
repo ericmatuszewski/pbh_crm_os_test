@@ -450,3 +450,340 @@ export async function completeExportRequest(
     },
   });
 }
+
+// ==================== COMPLIANCE AUDIT EXTENSIONS ====================
+
+/**
+ * Define sensitive fields that should be logged when accessed
+ */
+const SENSITIVE_FIELDS: Record<string, string[]> = {
+  contact: ["email", "phone", "address", "ssn", "dateOfBirth"],
+  company: ["taxId", "bankAccount"],
+  user: ["email", "phone", "authProvider", "externalId"],
+};
+
+/**
+ * Log sensitive field access (GDPR/SOC2 compliance)
+ */
+export async function logSensitiveAccess(
+  entity: string,
+  entityId: string,
+  accessedFields: string[],
+  context: AuditContext = {},
+  accessReason?: string
+): Promise<void> {
+  // Filter to only sensitive fields
+  const sensitiveFields = SENSITIVE_FIELDS[entity] || [];
+  const sensitiveAccess = accessedFields.filter((f) => sensitiveFields.includes(f));
+
+  if (sensitiveAccess.length === 0) return;
+
+  try {
+    await logAudit(
+      {
+        entity,
+        entityId,
+        action: AuditAction.VIEW,
+        metadata: {
+          accessedFields: sensitiveAccess,
+          accessReason,
+          isSensitiveAccess: true,
+        },
+      },
+      context
+    );
+  } catch (error) {
+    console.error("Failed to log sensitive access:", error);
+  }
+}
+
+/**
+ * Log failed authorization attempts (security compliance)
+ */
+export async function logAuthorizationFailure(
+  entity: string,
+  entityId: string,
+  attemptedAction: string,
+  context: AuditContext = {},
+  reason?: string
+): Promise<void> {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        entity,
+        entityId,
+        action: AuditAction.SHARE, // Using SHARE as closest match; could add ACCESS_DENIED
+        userId: context.userId,
+        userName: context.userName,
+        userEmail: context.userEmail,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        sessionId: context.sessionId,
+        metadata: {
+          type: "authorization_failure",
+          attemptedAction,
+          reason,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Failed to log authorization failure:", error);
+  }
+}
+
+/**
+ * Log administrative action (settings, config changes)
+ */
+export async function logAdminAction(
+  action: string,
+  description: string,
+  context: AuditContext = {},
+  details?: {
+    previousValue?: unknown;
+    newValue?: unknown;
+    affectedEntity?: string;
+    affectedEntityId?: string;
+  }
+): Promise<void> {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        entity: "system",
+        entityId: "admin-action",
+        action: AuditAction.UPDATE,
+        userId: context.userId,
+        userName: context.userName,
+        userEmail: context.userEmail,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        sessionId: context.sessionId,
+        previousValues: details?.previousValue
+          ? JSON.parse(JSON.stringify({ value: details.previousValue }))
+          : undefined,
+        newValues: details?.newValue
+          ? JSON.parse(JSON.stringify({ value: details.newValue }))
+          : undefined,
+        metadata: {
+          type: "admin_action",
+          action,
+          description,
+          affectedEntity: details?.affectedEntity,
+          affectedEntityId: details?.affectedEntityId,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Failed to log admin action:", error);
+  }
+}
+
+/**
+ * Log permission/role changes (RBAC audit)
+ */
+export async function logPermissionChange(
+  targetUserId: string,
+  changeType: "grant" | "revoke" | "modify",
+  context: AuditContext = {},
+  details: {
+    roleId?: string;
+    roleName?: string;
+    permissions?: string[];
+    previousPermissions?: string[];
+  }
+): Promise<void> {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        entity: "user_permission",
+        entityId: targetUserId,
+        action: AuditAction.UPDATE,
+        userId: context.userId,
+        userName: context.userName,
+        userEmail: context.userEmail,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        sessionId: context.sessionId,
+        previousValues: details.previousPermissions
+          ? JSON.parse(JSON.stringify({ permissions: details.previousPermissions }))
+          : undefined,
+        newValues: details.permissions
+          ? JSON.parse(JSON.stringify({ permissions: details.permissions }))
+          : undefined,
+        metadata: {
+          type: "permission_change",
+          changeType,
+          roleId: details.roleId,
+          roleName: details.roleName,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Failed to log permission change:", error);
+  }
+}
+
+/**
+ * Log API key operations (security compliance)
+ */
+export async function logApiKeyOperation(
+  operation: "create" | "revoke" | "update" | "use",
+  keyId: string,
+  keyName: string,
+  context: AuditContext = {},
+  details?: {
+    scopes?: string[];
+    ipAddress?: string;
+    endpoint?: string;
+  }
+): Promise<void> {
+  try {
+    const actionMap: Record<string, AuditAction> = {
+      create: AuditAction.CREATE,
+      revoke: AuditAction.DELETE,
+      update: AuditAction.UPDATE,
+      use: AuditAction.VIEW,
+    };
+
+    await prisma.auditLog.create({
+      data: {
+        entity: "api_key",
+        entityId: keyId,
+        action: actionMap[operation] || AuditAction.UPDATE,
+        userId: context.userId,
+        userName: context.userName,
+        userEmail: context.userEmail,
+        ipAddress: context.ipAddress || details?.ipAddress,
+        userAgent: context.userAgent,
+        sessionId: context.sessionId,
+        metadata: {
+          type: "api_key_operation",
+          operation,
+          keyName,
+          scopes: details?.scopes,
+          endpoint: details?.endpoint,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Failed to log API key operation:", error);
+  }
+}
+
+/**
+ * Log data export operation (GDPR compliance)
+ */
+export async function logDataExport(
+  exportType: string,
+  context: AuditContext = {},
+  details: {
+    entity?: string;
+    recordCount?: number;
+    filters?: Record<string, unknown>;
+    format?: string;
+  }
+): Promise<void> {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        entity: details.entity || "export",
+        entityId: `export-${Date.now()}`,
+        action: AuditAction.EXPORT,
+        userId: context.userId,
+        userName: context.userName,
+        userEmail: context.userEmail,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        sessionId: context.sessionId,
+        metadata: JSON.parse(JSON.stringify({
+          type: "data_export",
+          exportType,
+          recordCount: details.recordCount,
+          filters: details.filters,
+          format: details.format,
+          timestamp: new Date().toISOString(),
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Failed to log data export:", error);
+  }
+}
+
+/**
+ * Log bulk operation (compliance for mass changes)
+ */
+export async function logBulkOperation(
+  operation: string,
+  entity: string,
+  affectedIds: string[],
+  context: AuditContext = {},
+  details?: {
+    changes?: Record<string, unknown>;
+    filters?: Record<string, unknown>;
+  }
+): Promise<void> {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        entity,
+        entityId: `bulk-${Date.now()}`,
+        action: AuditAction.UPDATE,
+        userId: context.userId,
+        userName: context.userName,
+        userEmail: context.userEmail,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        sessionId: context.sessionId,
+        metadata: JSON.parse(JSON.stringify({
+          type: "bulk_operation",
+          operation,
+          affectedCount: affectedIds.length,
+          affectedIds: affectedIds.slice(0, 100), // Limit to first 100 for storage
+          changes: details?.changes,
+          filters: details?.filters,
+          timestamp: new Date().toISOString(),
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Failed to log bulk operation:", error);
+  }
+}
+
+/**
+ * Log GDPR-related action (data subject requests, consent changes)
+ */
+export async function logGdprAction(
+  actionType: "consent_granted" | "consent_withdrawn" | "erasure_requested" | "erasure_completed" | "data_exported",
+  contactId: string,
+  context: AuditContext = {},
+  details?: Record<string, unknown>
+): Promise<void> {
+  try {
+    await prisma.auditLog.create({
+      data: {
+        entity: "contact",
+        entityId: contactId,
+        action: AuditAction.UPDATE,
+        userId: context.userId,
+        userName: context.userName,
+        userEmail: context.userEmail,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        sessionId: context.sessionId,
+        metadata: {
+          type: "gdpr_action",
+          actionType,
+          ...details,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Failed to log GDPR action:", error);
+  }
+}

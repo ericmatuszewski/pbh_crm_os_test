@@ -104,6 +104,31 @@ enum UserStatus {
   PENDING_INVITE
 }
 
+// GDPR Consent Enums
+enum ConsentType {
+  EMAIL_MARKETING
+  SMS_MARKETING
+  PHONE_MARKETING
+  DATA_PROCESSING
+  THIRD_PARTY_SHARING
+  PROFILING
+}
+
+enum ConsentStatus {
+  PENDING
+  GRANTED
+  WITHDRAWN
+  EXPIRED
+}
+
+enum ErasureRequestStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
 // ==================== MODELS ====================
 
 // Pipeline for deal management
@@ -207,7 +232,9 @@ model User {
 
   // MFA readiness
   mfaEnabled        Boolean    @default(false)
-  mfaSecret         String?
+  mfaSecret         String?    // Encrypted TOTP secret
+  mfaBackupCodes    String[]   @default([]) // Hashed backup codes
+  mfaVerifiedAt     DateTime?  // When MFA was first verified/enabled
 
   // External authentication (LDAP/SSO)
   authProvider      String?    // LDAP, SAML, OIDC, etc.
@@ -512,6 +539,22 @@ model Contact {
 
   // Campaign attribution
   campaignId String?       // First touch campaign
+
+  // GDPR Consent & Privacy
+  consentStatus     ConsentStatus @default(PENDING)
+  consentDate       DateTime?
+  consentMethod     String?       // e.g., "web_form", "email", "verbal", "paper"
+  consentIpAddress  String?
+  doNotContact      Boolean       @default(false)
+  doNotEmail        Boolean       @default(false)
+  doNotCall         Boolean       @default(false)
+  doNotSms          Boolean       @default(false)
+  privacyNotes      String?
+  dataRetentionDate DateTime?     // When data should be deleted if consent expires
+  erasureRequestedAt DateTime?    // GDPR Article 17 request timestamp
+
+  consentEvents     ConsentEvent[]
+  erasureRequests   ErasureRequest[]
 
   tags       Tag[]
   deals      Deal[]
@@ -4002,4 +4045,86 @@ model CleanupConfiguration {
   @@unique([entity])
   @@index([isActive])
   @@index([nextRunAt])
+}
+
+// ==================== GDPR COMPLIANCE ====================
+
+// Tracks consent changes for GDPR Article 7 (conditions for consent)
+model ConsentEvent {
+  id              String        @id @default(cuid())
+
+  contactId       String
+  contact         Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  // Consent details
+  consentType     ConsentType
+  previousStatus  ConsentStatus?
+  newStatus       ConsentStatus
+  method          String        // web_form, email, api, verbal, paper, import
+  source          String?       // Specific form name, campaign, etc.
+
+  // Context
+  ipAddress       String?
+  userAgent       String?
+  documentUrl     String?       // Link to privacy policy version shown
+  languageCode    String?       // Language consent was given in
+
+  // Who recorded this
+  recordedById    String?
+  recordedByName  String?
+
+  // Audit
+  notes           String?
+
+  createdAt       DateTime      @default(now())
+
+  @@index([contactId])
+  @@index([consentType])
+  @@index([createdAt])
+}
+
+// GDPR Article 17 - Right to erasure requests
+model ErasureRequest {
+  id              String              @id @default(cuid())
+
+  contactId       String
+  contact         Contact             @relation(fields: [contactId], references: [id])
+
+  // Request details
+  requestSource   String              // contact_portal, email, phone, written
+  requestReason   String?             // Optional reason from data subject
+  status          ErasureRequestStatus @default(PENDING)
+
+  // Verification
+  verificationMethod String?          // email, phone, id_document
+  verifiedAt      DateTime?
+  verifiedById    String?
+
+  // Processing
+  processedById   String?
+  processedByName String?
+  processedAt     DateTime?
+
+  // What was deleted (for audit trail)
+  deletedRecords  Json?               // Summary: { contacts: 1, activities: 15, notes: 3, ... }
+  retainedRecords Json?               // What was kept (legal basis)
+  retentionReason String?             // Why some data was retained
+
+  // Rejection (if applicable)
+  rejectionReason String?
+
+  // Communication
+  acknowledgementSentAt DateTime?
+  completionNotifiedAt  DateTime?
+
+  // GDPR requires 30-day response
+  dueDate         DateTime            @default(dbgenerated("NOW() + INTERVAL '30 days'"))
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([contactId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([createdAt])
 }

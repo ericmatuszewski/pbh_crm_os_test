@@ -32,12 +32,12 @@ export function useKeyboardShortcuts(
       // Ignore if typing in an input, textarea, or contenteditable
       if (ignoreInputs) {
         const target = event.target as HTMLElement;
-        const tagName = target.tagName.toLowerCase();
+        const tagName = target?.tagName?.toLowerCase() || "";
         if (
           tagName === "input" ||
           tagName === "textarea" ||
           tagName === "select" ||
-          target.isContentEditable
+          target?.isContentEditable
         ) {
           return;
         }
