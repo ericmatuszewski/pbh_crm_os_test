@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth/get-current-user";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
       meta: { total, limit, offset },
     });
   } catch (error) {
-    console.error("Error fetching notes:", error);
+    logger.error("Failed to fetch notes", { error: error as Error, context: { route: "/api/notes" } });
     return NextResponse.json(
       { success: false, error: { code: "FETCH_ERROR", message: "Failed to fetch notes" } },
       { status: 500 }
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, data: note }, { status: 201 });
   } catch (error) {
-    console.error("Error creating note:", error);
+    logger.error("Failed to create note", { error: error as Error, context: { route: "/api/notes" } });
     return NextResponse.json(
       { success: false, error: { code: "CREATE_ERROR", message: "Failed to create note" } },
       { status: 500 }
