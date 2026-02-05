@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -121,11 +121,7 @@ export default function ContactDetailPage({
   const [contact, setContact] = useState<ContactDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchContact();
-  }, [id]);
-
-  const fetchContact = async () => {
+  const fetchContact = useCallback(async () => {
     try {
       const res = await fetch(`/api/contacts/${id}`);
       const data = await res.json();
@@ -141,7 +137,11 @@ export default function ContactDetailPage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, router]);
+
+  useEffect(() => {
+    fetchContact();
+  }, [fetchContact]);
 
   const handleDelete = async () => {
     if (!contact) return;

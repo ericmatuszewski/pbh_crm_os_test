@@ -162,7 +162,7 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
         toast.error("Failed to switch business");
       }
     },
-    [businesses]
+    [businesses, currentUser]
   );
 
   useEffect(() => {
