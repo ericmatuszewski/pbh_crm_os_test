@@ -278,10 +278,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(
-      `Email dropbox: ${provider} - ${direction} - ${email.subject} - Contact: ${contact?.id || "unknown"}`
-    );
-
     return NextResponse.json({
       success: true,
       emailLogId: emailLog.id,

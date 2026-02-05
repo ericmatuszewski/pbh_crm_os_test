@@ -158,10 +158,7 @@ export async function POST(request: NextRequest) {
       expiresAt
     );
 
-    // Log if sessions were revoked due to limit
-    if (enforcementResult.revokedCount > 0) {
-      console.log(`Session limit enforced for user ${user.id}: ${enforcementResult.revokedCount} sessions revoked`);
-    }
+    // Session limit enforcement handled - revokedCount available in enforcementResult if needed
 
     // Update user last login
     await prisma.user.update({

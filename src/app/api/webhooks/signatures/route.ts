@@ -180,8 +180,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!quote) {
-      // Log but don't error - might be a test webhook
-      console.log("No quote found for signature request:", event.envelopeId);
+      // No matching quote - might be a test webhook or different system
       return NextResponse.json({ success: true, message: "No matching quote" });
     }
 
@@ -250,9 +249,6 @@ export async function POST(request: NextRequest) {
         });
       }
     }
-
-    // Log the webhook for debugging
-    console.log(`Signature webhook processed: ${event.provider} - ${event.eventType} - ${event.status}`);
 
     return NextResponse.json({ success: true, status: event.status });
   } catch (error) {
