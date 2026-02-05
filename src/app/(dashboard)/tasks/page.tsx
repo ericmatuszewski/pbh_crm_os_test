@@ -68,10 +68,6 @@ import { format, isPast, isToday, isTomorrow } from "date-fns";
 interface TaskWithDependency extends Task {
   dependsOnId?: string | null;
   dependsOn?: { id: string; title: string; status: TaskStatus } | null;
-  isRecurring?: boolean;
-  recurrencePattern?: string;
-  recurrenceInterval?: number;
-  recurrenceEndDate?: string;
 }
 
 const statusLabels: Record<TaskStatus, string> = {
@@ -404,6 +400,15 @@ export default function TasksPage() {
                                 >
                                   <Lock className="w-3 h-3" />
                                   Blocked
+                                </span>
+                              )}
+                              {task.isRecurring && (
+                                <span
+                                  className="inline-flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded"
+                                  title={`Repeats ${task.recurrencePattern}${task.recurrenceInterval && task.recurrenceInterval > 1 ? ` every ${task.recurrenceInterval}` : ""}`}
+                                >
+                                  <Repeat className="w-3 h-3" />
+                                  Recurring
                                 </span>
                               )}
                             </div>

@@ -161,6 +161,12 @@ export interface Task {
   assignee?: User;
   relatedType: string | null;
   relatedId: string | null;
+  // Recurring task fields
+  isRecurring?: boolean;
+  recurrencePattern?: string | null;
+  recurrenceInterval?: number | null;
+  recurrenceEndDate?: Date | null;
+  parentTaskId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
