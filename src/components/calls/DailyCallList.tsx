@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { CallButton } from "./PhoneDialer";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { LoadingState } from "@/components/shared";
 
 interface ScheduledCall {
   id: string;
@@ -104,11 +105,7 @@ export function DailyCallList({
   );
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <LoadingState message="Loading calls..." />;
   }
 
   return (

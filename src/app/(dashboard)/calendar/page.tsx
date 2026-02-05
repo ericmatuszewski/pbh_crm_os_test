@@ -550,9 +550,7 @@ export default function CalendarPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {loading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                    </div>
+                    <LoadingState message="Loading meetings..." />
                   ) : meetings.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">
                       No meetings scheduled

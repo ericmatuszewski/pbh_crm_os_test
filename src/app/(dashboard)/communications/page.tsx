@@ -395,9 +395,7 @@ export default function CommunicationsPage() {
                 </CardHeader>
                 <CardContent>
                   {loading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                    </div>
+                    <LoadingState message="Loading templates..." />
                   ) : templates.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <FileText className="h-12 w-12 mx-auto mb-4 opacity-30" />
