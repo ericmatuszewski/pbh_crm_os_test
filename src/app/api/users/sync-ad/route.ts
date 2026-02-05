@@ -74,9 +74,15 @@ interface LDAPAttribute {
   values?: (string | Buffer)[];
 }
 
+// Type for the pojo structure returned by ldapjs at runtime
+interface LDAPEntryPojo {
+  dn?: string;
+  attributes?: LDAPAttribute[];
+}
+
 function parseADDetails(entry: ldap.SearchEntry): ADUserDetails {
-  const entryAny = entry as any;
-  const pojo = entryAny.pojo;
+  // ldapjs SearchEntry has a pojo property at runtime with attributes array
+  const pojo = (entry as ldap.SearchEntry & { pojo?: LDAPEntryPojo }).pojo;
 
   const getAttr = (name: string): string => {
     if (pojo && pojo.attributes && Array.isArray(pojo.attributes)) {

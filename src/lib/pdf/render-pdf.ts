@@ -1,9 +1,18 @@
 // PDF rendering utility that handles the React reconciler issue
 // by using dynamic imports with proper module resolution
 
-export async function renderPDFToBuffer(
-  Component: React.ComponentType<any>,
-  props: Record<string, any>
+// Type for props that can be passed to PDF components
+type PDFComponentProps = Record<string, unknown>;
+
+// Extended ReactPDF type with renderToBuffer (may not exist in all versions)
+interface ReactPDFWithRenderToBuffer {
+  renderToBuffer?: (element: React.ReactElement) => Promise<Uint8Array>;
+  pdf: (element: React.ReactElement) => { toBlob: () => Promise<Blob> };
+}
+
+export async function renderPDFToBuffer<P extends PDFComponentProps>(
+  Component: React.ComponentType<P>,
+  props: P
 ): Promise<Buffer> {
   // Import React and ReactPDF dynamically to avoid bundler issues
   const [React, ReactPDF] = await Promise.all([
@@ -14,8 +23,8 @@ export async function renderPDFToBuffer(
   const element = React.createElement(Component, props);
 
   try {
-    // Try using renderToBuffer first (cast to any to handle type mismatch)
-    const pdfModule = ReactPDF as any;
+    // Try using renderToBuffer first (cast to extended type for version compatibility)
+    const pdfModule = ReactPDF as unknown as ReactPDFWithRenderToBuffer;
     if (typeof pdfModule.renderToBuffer === "function") {
       const buffer = await pdfModule.renderToBuffer(element);
       return Buffer.from(buffer);

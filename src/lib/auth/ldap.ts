@@ -31,6 +31,12 @@ interface LDAPAttribute {
   values?: (string | Buffer)[];
 }
 
+// Type for the pojo structure returned by ldapjs at runtime
+interface LDAPEntryPojo {
+  dn?: string;
+  attributes?: LDAPAttribute[];
+}
+
 // Get LDAP config from environment
 export function getLDAPConfig(): LDAPConfig {
   return {
@@ -106,8 +112,8 @@ function searchAsync(
  * ldapjs returns entries with pojo.attributes array
  */
 function parseADUser(entry: ldap.SearchEntry): ADUser {
-  const entryAny = entry as any;
-  const pojo = entryAny.pojo;
+  // ldapjs SearchEntry has a pojo property at runtime with attributes array
+  const pojo = (entry as ldap.SearchEntry & { pojo?: LDAPEntryPojo }).pojo;
 
   // Helper to get single attribute value from pojo.attributes array
   const getAttr = (name: string): string => {
