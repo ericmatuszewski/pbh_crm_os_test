@@ -55,6 +55,8 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { WorkflowStatus, TriggerType, ActionType, AssignmentMethod, SequenceStatus } from "@/types";
+import { HelpTooltip } from "@/components/accessible/Tooltip";
+import { EmptyState, LoadingState } from "@/components/shared/StateComponents";
 
 interface Workflow {
   id: string;
@@ -527,8 +529,16 @@ export default function AutomationPage() {
                   </TableRow>
                 ) : workflows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No workflows created yet
+                    <TableCell colSpan={8}>
+                      <EmptyState
+                        icon={<Zap className="h-10 w-10" />}
+                        title="No workflows yet"
+                        description="Automate repetitive tasks by creating workflows that trigger actions based on events."
+                        action={{
+                          label: "Create Your First Workflow",
+                          onClick: () => setWorkflowDialogOpen(true),
+                        }}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -644,8 +654,16 @@ export default function AutomationPage() {
                   </TableRow>
                 ) : assignmentRules.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No assignment rules created yet
+                    <TableCell colSpan={7}>
+                      <EmptyState
+                        icon={<Users className="h-10 w-10" />}
+                        title="No assignment rules yet"
+                        description="Automatically assign leads and deals to the right team members based on criteria you define."
+                        action={{
+                          label: "Create Your First Rule",
+                          onClick: () => setAssignmentDialogOpen(true),
+                        }}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -723,8 +741,16 @@ export default function AutomationPage() {
                   </TableRow>
                 ) : sequences.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No sequences created yet
+                    <TableCell colSpan={7}>
+                      <EmptyState
+                        icon={<GitBranch className="h-10 w-10" />}
+                        title="No sequences yet"
+                        description="Create follow-up sequences to nurture leads with timed, automated touchpoints."
+                        action={{
+                          label: "Create Your First Sequence",
+                          onClick: () => setSequenceDialogOpen(true),
+                        }}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -827,8 +853,16 @@ export default function AutomationPage() {
                   </TableRow>
                 ) : slaPolicies.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No SLA policies created yet
+                    <TableCell colSpan={6}>
+                      <EmptyState
+                        icon={<Clock className="h-10 w-10" />}
+                        title="No SLA policies yet"
+                        description="Define service level agreements to ensure timely responses and escalate overdue items."
+                        action={{
+                          label: "Create Your First SLA Policy",
+                          onClick: () => setSlaDialogOpen(true),
+                        }}
+                      />
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1024,7 +1058,13 @@ export default function AutomationPage() {
               </Select>
             </div>
             <div>
-              <Label>Assignment Method</Label>
+              <div className="flex items-center gap-1 mb-1">
+                <Label>Assignment Method</Label>
+                <HelpTooltip
+                  content="Round Robin distributes evenly, Load Balanced assigns to least busy agent, Territory Based uses geographic rules, Skill Based matches agent expertise."
+                  iconSize="sm"
+                />
+              </div>
               <Select
                 value={assignmentForm.method}
                 onValueChange={(value) => setAssignmentForm({ ...assignmentForm, method: value as AssignmentMethod })}
@@ -1210,7 +1250,13 @@ export default function AutomationPage() {
               </Select>
             </div>
             <div>
-              <Label>Escalation Levels</Label>
+              <div className="flex items-center gap-1 mb-1">
+                <Label>Escalation Levels</Label>
+                <HelpTooltip
+                  content="'Before' triggers escalation X hours before the due date (proactive). 'After' triggers X hours after it's overdue (reactive)."
+                  iconSize="sm"
+                />
+              </div>
               <div className="space-y-2">
                 {slaForm.escalations.map((esc, index) => (
                   <div key={index} className="flex items-center gap-2">
