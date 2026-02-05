@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { updateTaskSchema } from "@/lib/validations";
 import { handleApiError, notFoundError, validationError } from "@/lib/api/errors";
 import { apiSuccess, apiDeleted } from "@/lib/api/response";
+import { addDays, addWeeks, addMonths } from "date-fns";
 
 export async function GET(
   request: NextRequest,
@@ -112,6 +113,51 @@ export async function PUT(
         assignee: { select: { id: true, name: true, email: true } },
       },
     });
+
+    // Handle recurring task: create next occurrence when completed
+    if (data.status === "COMPLETED" && task.isRecurring && task.recurrencePattern) {
+      const now = new Date();
+      const baseDate = task.dueDate || now;
+      const interval = task.recurrenceInterval || 1;
+
+      // Calculate next due date based on pattern
+      let nextDueDate: Date;
+      switch (task.recurrencePattern) {
+        case "daily":
+          nextDueDate = addDays(baseDate, interval);
+          break;
+        case "weekly":
+          nextDueDate = addWeeks(baseDate, interval);
+          break;
+        case "monthly":
+          nextDueDate = addMonths(baseDate, interval);
+          break;
+        default:
+          nextDueDate = addDays(baseDate, interval);
+      }
+
+      // Only create next occurrence if end date hasn't passed
+      const shouldCreate = !task.recurrenceEndDate || nextDueDate <= task.recurrenceEndDate;
+
+      if (shouldCreate) {
+        await prisma.task.create({
+          data: {
+            title: task.title,
+            description: task.description,
+            dueDate: nextDueDate,
+            priority: task.priority,
+            status: "TODO",
+            assigneeId: task.assigneeId,
+            businessId: task.businessId,
+            isRecurring: true,
+            recurrencePattern: task.recurrencePattern,
+            recurrenceInterval: task.recurrenceInterval,
+            recurrenceEndDate: task.recurrenceEndDate,
+            parentTaskId: task.id,
+          },
+        });
+      }
+    }
 
     // Fetch dependency if exists
     let dependsOn = null;
