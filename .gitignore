@@ -27,6 +27,12 @@ tsconfig.tsbuildinfo
 # Playwright
 .playwright-mcp/
 
+# Test coverage
+coverage/
+
+# Screenshots (review artifacts)
+*.png
+
 # Auto Claude data directory
 .auto-claude/
 
