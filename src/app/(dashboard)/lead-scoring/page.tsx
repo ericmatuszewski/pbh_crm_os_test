@@ -37,6 +37,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   TrendingUp,
   Plus,
   Star,
@@ -49,8 +56,13 @@ import {
   Settings,
   Trash2,
   Eye,
+  MoreVertical,
+  Pencil,
 } from "lucide-react";
 import { format } from "date-fns";
+import { HelpTooltip, InfoTooltip } from "@/components/accessible/Tooltip";
+import { EmptyState } from "@/components/shared/StateComponents";
+import { cn } from "@/lib/utils";
 import {
   ScoringEventType,
   MarketingCampaignStatus,
@@ -166,6 +178,11 @@ export default function LeadScoringPage() {
   const [campaignDialogOpen, setCampaignDialogOpen] = useState(false);
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<LeadScoringModel | null>(null);
+
+  // Edit/Delete rule states
+  const [editingRule, setEditingRule] = useState<ScoringRule | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [ruleToDelete, setRuleToDelete] = useState<{ rule: ScoringRule; modelId: string } | null>(null);
 
   // Form states
   const [modelForm, setModelForm] = useState({
@@ -324,6 +341,81 @@ export default function LeadScoringPage() {
     } catch (error) {
       console.error("Failed to add rule:", error);
     }
+  };
+
+  const updateRule = async (modelId: string, ruleId: string, updates: Partial<ScoringRule>) => {
+    try {
+      const response = await fetch(`/api/lead-scoring/${modelId}/rules/${ruleId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+
+      if (response.ok) {
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Failed to update rule:", error);
+    }
+  };
+
+  const deleteRule = async (modelId: string, ruleId: string) => {
+    try {
+      const response = await fetch(`/api/lead-scoring/${modelId}/rules/${ruleId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setDeleteConfirmOpen(false);
+        setRuleToDelete(null);
+        fetchData();
+      }
+    } catch (error) {
+      console.error("Failed to delete rule:", error);
+    }
+  };
+
+  const handleEditRule = (rule: ScoringRule, model: LeadScoringModel) => {
+    setEditingRule(rule);
+    setSelectedModel(model);
+    setRuleForm({
+      name: rule.name,
+      description: rule.description || "",
+      eventType: rule.eventType,
+      points: rule.points,
+      maxOccurrences: rule.maxOccurrences?.toString() || "",
+      cooldownHours: rule.cooldownHours?.toString() || "",
+    });
+    setRuleDialogOpen(true);
+  };
+
+  const handleDeleteClick = (rule: ScoringRule, modelId: string) => {
+    setRuleToDelete({ rule, modelId });
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleUpdateRule = async () => {
+    if (!selectedModel || !editingRule) return;
+
+    await updateRule(selectedModel.id, editingRule.id, {
+      name: ruleForm.name,
+      eventType: ruleForm.eventType,
+      points: ruleForm.points,
+      maxOccurrences: ruleForm.maxOccurrences ? parseInt(ruleForm.maxOccurrences) : null,
+      cooldownHours: ruleForm.cooldownHours ? parseInt(ruleForm.cooldownHours) : null,
+    });
+
+    setRuleDialogOpen(false);
+    setEditingRule(null);
+    setRuleForm({
+      name: "",
+      description: "",
+      eventType: "EMAIL_OPENED",
+      points: 5,
+      maxOccurrences: "",
+      cooldownHours: "",
+    });
+    setSelectedModel(null);
   };
 
   const createSource = async () => {
@@ -508,8 +600,16 @@ export default function LeadScoringPage() {
             {loading ? (
               <div className="col-span-2 text-center py-8">Loading...</div>
             ) : models.length === 0 ? (
-              <div className="col-span-2 text-center py-8 text-muted-foreground">
-                No scoring models created yet
+              <div className="col-span-2">
+                <EmptyState
+                  icon={<Star className="h-12 w-12" />}
+                  title="No scoring models yet"
+                  description="Create a scoring model to automatically qualify leads based on their engagement and behavior."
+                  action={{
+                    label: "Create Your First Model",
+                    onClick: () => setModelDialogOpen(true),
+                  }}
+                />
               </div>
             ) : (
               models.map((model) => (
@@ -551,13 +651,21 @@ export default function LeadScoringPage() {
                   <CardContent>
                     <div className="space-y-4">
                       <div className="flex gap-4 text-sm">
-                        <div>
+                        <div className="flex items-center gap-1">
                           <span className="text-muted-foreground">Qualified at:</span>{" "}
-                          <Badge variant="outline">{model.qualifiedThreshold} pts</Badge>
+                          <InfoTooltip
+                            content={`When a lead reaches ${model.qualifiedThreshold} points, they're automatically marked as "Qualified" and ready for sales outreach.`}
+                          >
+                            <Badge variant="outline">{model.qualifiedThreshold} pts</Badge>
+                          </InfoTooltip>
                         </div>
-                        <div>
+                        <div className="flex items-center gap-1">
                           <span className="text-muted-foreground">Customer at:</span>{" "}
-                          <Badge variant="outline">{model.customerThreshold} pts</Badge>
+                          <InfoTooltip
+                            content={`At ${model.customerThreshold} points, leads are considered "Hot" and highly likely to convert to customers.`}
+                          >
+                            <Badge variant="outline">{model.customerThreshold} pts</Badge>
+                          </InfoTooltip>
                         </div>
                       </div>
 
@@ -577,30 +685,87 @@ export default function LeadScoringPage() {
                           </Button>
                         </div>
                         {model.rules.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No rules defined</p>
+                          <EmptyState
+                            icon={<Target className="h-8 w-8" />}
+                            title="No scoring rules yet"
+                            description="Add rules to automatically score leads based on their engagement."
+                            action={{
+                              label: "Add First Rule",
+                              onClick: () => {
+                                setSelectedModel(model);
+                                setRuleDialogOpen(true);
+                              },
+                            }}
+                          />
                         ) : (
                           <div className="space-y-2">
                             {model.rules.map((rule) => (
                               <div
                                 key={rule.id}
-                                className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"
+                                className={cn(
+                                  "flex items-center justify-between p-3 rounded-lg transition-colors",
+                                  "hover:bg-muted/70",
+                                  Math.abs(rule.points) >= 15
+                                    ? "bg-muted border-l-4 border-l-primary"
+                                    : "bg-muted/50"
+                                )}
                               >
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <Badge variant="outline" className="text-xs shrink-0">
                                     {eventTypeLabels[rule.eventType]}
                                   </Badge>
-                                  <span className="text-sm">{rule.name}</span>
+                                  {rule.name !== eventTypeLabels[rule.eventType] && (
+                                    <span className="text-sm truncate" title={rule.name}>
+                                      {rule.name}
+                                    </span>
+                                  )}
+                                  {rule.maxOccurrences && (
+                                    <span className="text-xs text-muted-foreground">
+                                      (max {rule.maxOccurrences}x)
+                                    </span>
+                                  )}
                                 </div>
-                                <Badge
-                                  className={
-                                    rule.points > 0
-                                      ? "bg-green-100 text-green-700"
-                                      : "bg-red-100 text-red-700"
-                                  }
-                                >
-                                  {rule.points > 0 ? "+" : ""}
-                                  {rule.points} pts
-                                </Badge>
+                                <div className="flex items-center gap-2">
+                                  <Badge
+                                    className={cn(
+                                      "font-semibold",
+                                      rule.points >= 15
+                                        ? "bg-green-200 text-green-800"
+                                        : rule.points > 0
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-red-100 text-red-700"
+                                    )}
+                                  >
+                                    {rule.points > 0 ? "+" : ""}
+                                    {rule.points} pts
+                                  </Badge>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        aria-label={`Actions for ${rule.name}`}
+                                      >
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => handleEditRule(rule, model)}>
+                                        <Pencil className="mr-2 h-4 w-4" />
+                                        Edit Rule
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        className="text-destructive focus:text-destructive"
+                                        onClick={() => handleDeleteClick(rule, model.id)}
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete Rule
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -877,26 +1042,58 @@ export default function LeadScoringPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Rule Dialog */}
-      <Dialog open={ruleDialogOpen} onOpenChange={setRuleDialogOpen}>
+      {/* Add/Edit Rule Dialog */}
+      <Dialog
+        open={ruleDialogOpen}
+        onOpenChange={(open) => {
+          setRuleDialogOpen(open);
+          if (!open) {
+            setEditingRule(null);
+            setRuleForm({
+              name: "",
+              description: "",
+              eventType: "EMAIL_OPENED",
+              points: 5,
+              maxOccurrences: "",
+              cooldownHours: "",
+            });
+          }
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Scoring Rule</DialogTitle>
+            <DialogTitle>
+              {editingRule ? "Edit Scoring Rule" : "Add Scoring Rule"}
+            </DialogTitle>
             <DialogDescription>
-              Define when and how many points to award
+              {editingRule
+                ? "Update the rule configuration"
+                : "Define when and how many points to award"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Rule Name</Label>
+              <div className="flex items-center gap-1 mb-1">
+                <Label>Rule Name</Label>
+                <HelpTooltip
+                  content="A descriptive name for this rule. Use something specific like 'High-value demo request' rather than just the event type."
+                  iconSize="sm"
+                />
+              </div>
               <Input
                 value={ruleForm.name}
                 onChange={(e) => setRuleForm({ ...ruleForm, name: e.target.value })}
-                placeholder="e.g., Email engagement"
+                placeholder="e.g., Enterprise demo request"
               />
             </div>
             <div>
-              <Label>Event Type</Label>
+              <div className="flex items-center gap-1 mb-1">
+                <Label>Event Type</Label>
+                <HelpTooltip
+                  content="The type of engagement that triggers this rule. Each event type can have multiple rules with different point values."
+                  iconSize="sm"
+                />
+              </div>
               <Select
                 value={ruleForm.eventType}
                 onValueChange={(value) => setRuleForm({ ...ruleForm, eventType: value as ScoringEventType })}
@@ -914,19 +1111,31 @@ export default function LeadScoringPage() {
               </Select>
             </div>
             <div>
-              <Label>Points</Label>
+              <div className="flex items-center gap-1 mb-1">
+                <Label>Points</Label>
+                <HelpTooltip
+                  content="Points awarded when this event occurs. Use positive values to increase lead score, negative to decrease (e.g., -5 for unsubscribe)."
+                  iconSize="sm"
+                />
+              </div>
               <Input
                 type="number"
                 value={ruleForm.points}
                 onChange={(e) => setRuleForm({ ...ruleForm, points: parseInt(e.target.value) || 0 })}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Positive for increase, negative for decrease
+                Range: -100 to +100 points
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Max Occurrences</Label>
+                <div className="flex items-center gap-1 mb-1">
+                  <Label>Max Occurrences</Label>
+                  <HelpTooltip
+                    content="Limit how many times this rule can award points per contact. Leave empty for unlimited."
+                    iconSize="sm"
+                  />
+                </div>
                 <Input
                   type="number"
                   value={ruleForm.maxOccurrences}
@@ -935,7 +1144,13 @@ export default function LeadScoringPage() {
                 />
               </div>
               <div>
-                <Label>Cooldown (hours)</Label>
+                <div className="flex items-center gap-1 mb-1">
+                  <Label>Cooldown (hours)</Label>
+                  <HelpTooltip
+                    content="Minimum hours between awarding points for the same event. Prevents spam from rapidly repeated actions."
+                    iconSize="sm"
+                  />
+                </div>
                 <Input
                   type="number"
                   value={ruleForm.cooldownHours}
@@ -949,7 +1164,9 @@ export default function LeadScoringPage() {
             <Button variant="outline" onClick={() => setRuleDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={addRuleToModel}>Add Rule</Button>
+            <Button onClick={editingRule ? handleUpdateRule : addRuleToModel}>
+              {editingRule ? "Save Changes" : "Add Rule"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1146,6 +1363,40 @@ export default function LeadScoringPage() {
               Cancel
             </Button>
             <Button onClick={createCampaign}>Create Campaign</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Rule Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Rule</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete &quot;{ruleToDelete?.rule.name}&quot;?
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                setRuleToDelete(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (ruleToDelete) {
+                  deleteRule(ruleToDelete.modelId, ruleToDelete.rule.id);
+                }
+              }}
+            >
+              Delete
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
