@@ -337,9 +337,188 @@ export async function getSessionStats() {
   };
 }
 
+// ==================== CONCURRENT SESSION LIMITS ====================
+
+// Default max concurrent sessions per user
+const DEFAULT_MAX_SESSIONS = 5;
+
+/**
+ * Get max sessions limit from settings or default
+ */
+export async function getMaxSessionsLimit(): Promise<number> {
+  try {
+    const settings = await prisma.systemSettings.findFirst();
+    // Could add maxConcurrentSessions to SystemSettings schema
+    // For now, use default or environment variable
+    return parseInt(process.env.MAX_CONCURRENT_SESSIONS || String(DEFAULT_MAX_SESSIONS), 10);
+  } catch {
+    return DEFAULT_MAX_SESSIONS;
+  }
+}
+
+/**
+ * Count active sessions for a user
+ */
+export async function countActiveSessions(userId: string): Promise<number> {
+  return prisma.userSession.count({
+    where: {
+      userId,
+      isActive: true,
+      expiresAt: { gt: new Date() },
+    },
+  });
+}
+
+/**
+ * Check if user has reached session limit
+ */
+export async function hasReachedSessionLimit(userId: string): Promise<boolean> {
+  const [count, limit] = await Promise.all([
+    countActiveSessions(userId),
+    getMaxSessionsLimit(),
+  ]);
+  return count >= limit;
+}
+
+/**
+ * Enforce session limit by revoking oldest sessions if needed
+ * Call this when creating a new session
+ */
+export async function enforceSessionLimit(
+  userId: string,
+  newSessionToken?: string
+): Promise<{ revokedCount: number; revokedSessions: string[] }> {
+  const limit = await getMaxSessionsLimit();
+
+  // Get all active sessions, ordered by last activity (oldest first)
+  const sessions = await prisma.userSession.findMany({
+    where: {
+      userId,
+      isActive: true,
+      expiresAt: { gt: new Date() },
+      ...(newSessionToken && { sessionToken: { not: newSessionToken } }),
+    },
+    orderBy: { lastActiveAt: "asc" },
+    select: {
+      id: true,
+      sessionToken: true,
+      deviceName: true,
+      lastActiveAt: true,
+    },
+  });
+
+  // Calculate how many to revoke (account for the new session being created)
+  const currentCount = sessions.length + (newSessionToken ? 1 : 0);
+  const toRevoke = currentCount - limit;
+
+  if (toRevoke <= 0) {
+    return { revokedCount: 0, revokedSessions: [] };
+  }
+
+  // Revoke oldest sessions
+  const sessionsToRevoke = sessions.slice(0, toRevoke);
+  const revokedTokens = sessionsToRevoke.map((s) => s.sessionToken);
+
+  // Update UserSessions
+  await prisma.userSession.updateMany({
+    where: {
+      sessionToken: { in: revokedTokens },
+    },
+    data: {
+      isActive: false,
+      revokedAt: new Date(),
+      revokedReason: "Session limit exceeded - oldest session revoked",
+    },
+  });
+
+  // Delete from NextAuth Session table
+  await prisma.session.deleteMany({
+    where: {
+      sessionToken: { in: revokedTokens },
+    },
+  });
+
+  // Log the enforcement
+  await logAudit(
+    {
+      action: "DELETE",
+      entity: "user_session",
+      entityId: userId,
+      metadata: {
+        type: "session_limit_enforced",
+        revokedCount: toRevoke,
+        revokedSessions: sessionsToRevoke.map((s) => ({
+          id: s.id,
+          deviceName: s.deviceName,
+          lastActiveAt: s.lastActiveAt,
+        })),
+        limit,
+      },
+    },
+    { userId }
+  );
+
+  return {
+    revokedCount: toRevoke,
+    revokedSessions: revokedTokens,
+  };
+}
+
+/**
+ * Create session with limit enforcement
+ * This is the recommended function to use for new sessions
+ */
+export async function createSessionWithLimitEnforcement(
+  sessionToken: string,
+  userId: string,
+  userAgent: string,
+  location: LocationInfo,
+  expiresAt: Date
+): Promise<{
+  session: Awaited<ReturnType<typeof createUserSession>>;
+  enforcementResult: Awaited<ReturnType<typeof enforceSessionLimit>>;
+}> {
+  // Enforce limit first (revoke oldest if needed)
+  const enforcementResult = await enforceSessionLimit(userId, sessionToken);
+
+  // Create the new session
+  const session = await createUserSession(
+    sessionToken,
+    userId,
+    userAgent,
+    location,
+    expiresAt
+  );
+
+  return { session, enforcementResult };
+}
+
+/**
+ * Get session limit status for a user
+ */
+export async function getSessionLimitStatus(userId: string): Promise<{
+  currentCount: number;
+  limit: number;
+  isAtLimit: boolean;
+  canCreateNew: boolean;
+}> {
+  const [count, limit] = await Promise.all([
+    countActiveSessions(userId),
+    getMaxSessionsLimit(),
+  ]);
+
+  return {
+    currentCount: count,
+    limit,
+    isAtLimit: count >= limit,
+    canCreateNew: true, // Always can create, but oldest will be revoked
+  };
+}
+
 const sessionService = {
   parseUserAgent,
   createUserSession,
+  createSessionWithLimitEnforcement,
   updateSessionActivity,
   getActiveSessions,
   revokeSession,
@@ -347,6 +526,12 @@ const sessionService = {
   getSessionByToken,
   cleanupExpiredSessions,
   getSessionStats,
+  // Session limit functions
+  getMaxSessionsLimit,
+  countActiveSessions,
+  hasReachedSessionLimit,
+  enforceSessionLimit,
+  getSessionLimitStatus,
 };
 
 export default sessionService;

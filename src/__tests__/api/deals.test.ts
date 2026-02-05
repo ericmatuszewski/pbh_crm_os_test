@@ -14,6 +14,9 @@ const mockPrisma = {
     delete: jest.fn(),
     count: jest.fn(),
   },
+  task: {
+    findMany: jest.fn(),
+  },
   pipeline: {
     findFirst: jest.fn(),
   },
@@ -104,10 +107,11 @@ describe('Deals API Routes', () => {
       const request = createRequest('http://localhost:3000/api/deals?status=WON');
       await GET(request);
 
+      // API maps status=WON to stage=CLOSED_WON
       expect(mockPrisma.deal.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            status: 'WON',
+            stage: 'CLOSED_WON',
           }),
         })
       );
@@ -200,10 +204,13 @@ describe('Deals API Routes', () => {
         contact: { id: 'contact-1', firstName: 'John', lastName: 'Doe' },
         stage: { id: 'stage-1', name: 'Negotiation' },
         activities: [],
-        tasks: [],
+        notes: [],
+        quotes: [],
       };
 
       mockPrisma.deal.findUnique.mockResolvedValue(mockDeal);
+      // Route also fetches related tasks
+      mockPrisma.task.findMany.mockResolvedValue([]);
 
       const { GET } = await import('@/app/api/deals/[id]/route');
       const request = createRequest('http://localhost:3000/api/deals/deal-1');

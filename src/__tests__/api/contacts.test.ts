@@ -45,6 +45,13 @@ const mockPrisma = {
 jest.mock('@/lib/prisma', () => ({
   __esModule: true,
   default: mockPrisma,
+  prisma: mockPrisma,
+}));
+
+// Mock business scoping
+jest.mock('@/lib/business', () => ({
+  getCurrentBusiness: jest.fn().mockResolvedValue({ id: 'business-1', parentId: null }),
+  buildBusinessScopeFilter: jest.fn().mockResolvedValue({ businessId: 'business-1' }),
 }));
 
 // Helper to create NextRequest
