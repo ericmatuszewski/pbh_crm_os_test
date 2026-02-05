@@ -30,6 +30,16 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState, LoadingState, InlineEdit } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, Building2, Search, MoreHorizontal, Pencil, Trash2, Globe, MapPin, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
@@ -59,6 +69,8 @@ function CompaniesPageContent() {
     searchInputRef.current?.focus();
   }, []);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     website: "",
@@ -140,16 +152,22 @@ function CompaniesPageContent() {
     }
   };
 
-  const handleDelete = async (company: Company) => {
-    if (!window.confirm(`Are you sure you want to delete ${company.name}?`)) {
-      return;
-    }
+  const handleDeleteClick = (company: Company) => {
+    setCompanyToDelete(company);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!companyToDelete) return;
 
     try {
-      await deleteMutation.mutateAsync(company.id);
+      await deleteMutation.mutateAsync(companyToDelete.id);
       toast.success("Company deleted successfully");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete company");
+    } finally {
+      setDeleteDialogOpen(false);
+      setCompanyToDelete(null);
     }
   };
 
@@ -277,7 +295,7 @@ function CompaniesPageContent() {
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                onClick={() => handleDelete(company)}
+                                onClick={() => handleDeleteClick(company)}
                                 className="text-red-600"
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />
@@ -457,6 +475,27 @@ function CompaniesPageContent() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Company</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{companyToDelete?.name}&rdquo;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setCompanyToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

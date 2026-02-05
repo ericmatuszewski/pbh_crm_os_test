@@ -56,6 +56,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { EmptyState, LoadingState } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Document {
   id: string;
@@ -121,6 +132,8 @@ export default function DocumentsPage() {
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -223,17 +236,25 @@ export default function DocumentsPage() {
     }
   };
 
-  const handleDelete = async (doc: Document) => {
-    if (!confirm(`Are you sure you want to delete "${doc.name}"?`)) return;
+  const handleDeleteClick = (doc: Document) => {
+    setDocumentToDelete(doc);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!documentToDelete) return;
 
     try {
-      const res = await fetch(`/api/documents/${doc.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/documents/${documentToDelete.id}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
-        setDocuments(documents.filter((d) => d.id !== doc.id));
+        setDocuments(documents.filter((d) => d.id !== documentToDelete.id));
       }
     } catch (error) {
       console.error("Delete failed:", error);
+    } finally {
+      setDeleteDialogOpen(false);
+      setDocumentToDelete(null);
     }
   };
 
@@ -383,7 +404,7 @@ export default function DocumentsPage() {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-destructive"
-                  onClick={() => handleDelete(doc)}
+                  onClick={() => handleDeleteClick(doc)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -439,7 +460,7 @@ export default function DocumentsPage() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-destructive"
-                      onClick={() => handleDelete(doc)}
+                      onClick={() => handleDeleteClick(doc)}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
@@ -678,6 +699,27 @@ export default function DocumentsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{documentToDelete?.name}&rdquo;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDocumentToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

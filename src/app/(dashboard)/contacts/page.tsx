@@ -9,6 +9,16 @@ import { ContactFilters } from "@/components/contacts/ContactFilters";
 import { ContactForm } from "@/components/contacts/ContactForm";
 import { ImportDialog } from "@/components/import";
 import { EmptyState, LoadingState } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, Users, Upload, AlertCircle } from "lucide-react";
 import { Contact, CreateContactInput } from "@/types";
 import { toast } from "sonner";
@@ -26,6 +36,10 @@ function ContactsPageContent() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contactToDelete, setContactToDelete] = useState<Contact | null>(null);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<string[]>([]);
 
   // Debounce search for better performance
   const debouncedSearch = useDebounce(filters.search, 300);
@@ -79,29 +93,39 @@ function ContactsPageContent() {
     }
   };
 
-  const handleDeleteContact = async (contact: Contact) => {
-    if (!window.confirm(`Are you sure you want to delete ${contact.firstName} ${contact.lastName}?`)) {
-      return;
-    }
+  const handleDeleteClick = (contact: Contact) => {
+    setContactToDelete(contact);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!contactToDelete) return;
 
     try {
-      await deleteMutation.mutateAsync(contact.id);
+      await deleteMutation.mutateAsync(contactToDelete.id);
       toast.success("Contact deleted successfully");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete contact");
+    } finally {
+      setDeleteDialogOpen(false);
+      setContactToDelete(null);
     }
   };
 
-  const handleBulkDelete = async (ids: string[]) => {
-    if (!window.confirm(`Are you sure you want to delete ${ids.length} contacts?`)) {
-      return;
-    }
+  const handleBulkDeleteClick = (ids: string[]) => {
+    setBulkDeleteIds(ids);
+    setBulkDeleteDialogOpen(true);
+  };
 
+  const handleBulkDeleteConfirm = async () => {
     try {
-      await Promise.all(ids.map((id) => deleteMutation.mutateAsync(id)));
-      toast.success(`${ids.length} contacts deleted successfully`);
+      await Promise.all(bulkDeleteIds.map((id) => deleteMutation.mutateAsync(id)));
+      toast.success(`${bulkDeleteIds.length} contacts deleted successfully`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete contacts");
+    } finally {
+      setBulkDeleteDialogOpen(false);
+      setBulkDeleteIds([]);
     }
   };
 
@@ -160,8 +184,8 @@ function ContactsPageContent() {
               <ContactTable
                 contacts={contacts}
                 onEdit={handleEditContact}
-                onDelete={handleDeleteContact}
-                onBulkDelete={handleBulkDelete}
+                onDelete={handleDeleteClick}
+                onBulkDelete={handleBulkDeleteClick}
               />
             ) : (
               <div className="bg-white rounded-lg border">
@@ -215,6 +239,48 @@ function ContactsPageContent() {
           refetchContacts();
         }}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Contact</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {contactToDelete?.firstName} {contactToDelete?.lastName}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setContactToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {bulkDeleteIds.length} Contacts</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {bulkDeleteIds.length} contacts? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setBulkDeleteIds([])}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

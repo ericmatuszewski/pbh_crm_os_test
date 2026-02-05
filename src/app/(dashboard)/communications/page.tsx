@@ -42,6 +42,17 @@ import {
   Code,
 } from "lucide-react";
 import { format } from "date-fns";
+import { EmptyState, LoadingState } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface EmailTemplate {
   id: string;
@@ -84,6 +95,8 @@ export default function CommunicationsPage() {
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [showPreview, setShowPreview] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<EmailTemplate | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -152,11 +165,16 @@ export default function CommunicationsPage() {
     setShowDialog(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this template?")) return;
+  const handleDeleteClick = (template: EmailTemplate) => {
+    setTemplateToDelete(template);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!templateToDelete) return;
 
     try {
-      const response = await fetch(`/api/email-templates/${id}`, {
+      const response = await fetch(`/api/email-templates/${templateToDelete.id}`, {
         method: "DELETE",
       });
 
@@ -165,6 +183,9 @@ export default function CommunicationsPage() {
       }
     } catch (error) {
       console.error("Failed to delete template:", error);
+    } finally {
+      setDeleteDialogOpen(false);
+      setTemplateToDelete(null);
     }
   };
 
@@ -450,7 +471,7 @@ export default function CommunicationsPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleDelete(template.id)}
+                                  onClick={() => handleDeleteClick(template)}
                                   title="Delete"
                                 >
                                   <Trash2 className="h-4 w-4 text-destructive" />
@@ -525,6 +546,27 @@ export default function CommunicationsPage() {
           </Dialog>
         </main>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{templateToDelete?.name}&rdquo;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTemplateToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

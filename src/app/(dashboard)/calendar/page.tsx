@@ -34,6 +34,17 @@ import {
   Edit2,
   Trash2,
 } from "lucide-react";
+import { EmptyState, LoadingState } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   format,
   startOfMonth,
@@ -83,6 +94,8 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [meetingToDelete, setMeetingToDelete] = useState<Meeting | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -186,11 +199,16 @@ export default function CalendarPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this meeting?")) return;
+  const handleDeleteClick = (meeting: Meeting) => {
+    setMeetingToDelete(meeting);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!meetingToDelete) return;
 
     try {
-      const response = await fetch(`/api/meetings/${id}`, {
+      const response = await fetch(`/api/meetings/${meetingToDelete.id}`, {
         method: "DELETE",
       });
 
@@ -199,6 +217,9 @@ export default function CalendarPage() {
       }
     } catch (error) {
       console.error("Failed to delete meeting:", error);
+    } finally {
+      setDeleteDialogOpen(false);
+      setMeetingToDelete(null);
     }
   };
 
@@ -562,7 +583,7 @@ export default function CalendarPage() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => handleDelete(meeting.id)}
+                                onClick={() => handleDeleteClick(meeting)}
                               >
                                 <Trash2 className="h-3 w-3 text-destructive" />
                               </Button>
@@ -608,6 +629,27 @@ export default function CalendarPage() {
           </div>
         </main>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Meeting</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &ldquo;{meetingToDelete?.title}&rdquo;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setMeetingToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
